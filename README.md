@@ -1,5 +1,14 @@
 # Projet-Data-2A-
 
+colonnes :
+ "code_iris", "date", "lat", "lon",
+        "nb_signalements", "taux_signalements_10k_hab",
+        "temp_max_c", "precip_mm", "pluie_veille", "jour_semaine", "est_weekend", "mois", "est_vacances_zone_c",
+        "nb_restos_fastfood", "nb_commerces_bouche", "nb_poubelles_containers", "surface_parcs_m2", "dist_eau_m",
+        "presence_marche_jour", "nb_chantiers_actifs",
+        "pop_totale_iris", "densite_pop_km2"
+
+      
 liens importants :
 
 ### Eleve 1 : Astrid 
