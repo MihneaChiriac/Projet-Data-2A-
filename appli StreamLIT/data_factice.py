@@ -38,6 +38,8 @@ def generate_mock_dataset(n_iris=50, n_days=60, output_path="mock_data.parquet")
     
     # Précipitations (mm)
     grid["precip_mm"] = np.round(np.random.exponential(scale=2.5, size=len(grid)) * np.random.choice([0, 1], p=[0.6, 0.4], size=len(grid)), 1)
+    #choice = loi de bernoulli 
+    # exp car les grosses pluies sont très rares
     
     # Pluie la veille (calculé par IRIS)
     grid = grid.sort_values(["code_iris", "date"]).reset_index(drop=True)
@@ -70,21 +72,25 @@ def generate_mock_dataset(n_iris=50, n_days=60, output_path="mock_data.parquet")
     grid["presence_marche_jour"] = np.random.choice([True, False], size=len(grid), p=[0.15, 0.85])
     grid["nb_chantiers_actifs"] = np.random.choice([0, 1, 2, 3], size=len(grid), p=[0.5, 0.3, 0.15, 0.05])
 
-    # 4. Génération de la Cible (Régression de Poisson sous-jacente)
-    # Log-lambda basé sur les vraies interactions attendues
-    log_lambda = (
-        -2.0
-        + 0.04 * (grid["nb_restos_fastfood"] - 15)
-        + 0.02 * (grid["temp_max_c"] - 15)
-        + 0.4 * grid["pluie_veille"].astype(int)
-        + 0.3 * grid["presence_marche_jour"].astype(int)
-        + 0.2 * grid["nb_chantiers_actifs"]
-        - 0.0003 * grid["dist_eau_m"]
-        + np.log(grid["pop_totale_iris"] / 3000)
+   # 4. Génération de la Cible (Régression linéaire sous-jacente)
+    y_pred = (
+        5.0                                              
+        + 0.25 * (grid["nb_restos_fastfood"] - 15)       
+        + 0.15 * (grid["temp_max_c"] - 15)               
+        + 2.0 * grid["pluie_veille"].astype(int)         
+        + 1.5 * grid["presence_marche_jour"].astype(int)   
+        + 1.0 * grid["nb_chantiers_actifs"]              
+        - 0.002 * grid["dist_eau_m"]                    
+        + 1.0 * (grid["pop_totale_iris"] / 3000)         
     )
-    lambda_param = np.exp(log_lambda)
-    grid["nb_signalements"] = np.random.poisson(lam=lambda_param)
 
+    # Ajout du bruit  N(0, sigma^2) propre à la régression linéaire
+    bruit = np.random.normal(loc=0.0, scale=2.0, size=len(grid))
+    y_bruite = y_pred + bruit
+
+    # Arrondi à l'entier et seuillage à 0 (un nombre de signalements ne peut pas être négatif)
+    grid["nb_signalements"] = np.maximum(0, np.round(y_bruite)).astype(int)
+    
     # Normalisation du taux pour 10 000 habitants
     grid["taux_signalements_10k_hab"] = np.round((grid["nb_signalements"] / grid["pop_totale_iris"]) * 10000, 2)
 
