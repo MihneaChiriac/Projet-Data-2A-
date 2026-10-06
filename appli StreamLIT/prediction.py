@@ -118,7 +118,7 @@ def predict_risk_by_quartier(model, df_iris_features, temp_max_c, pluie_veille, 
     iris_df["nb_signalements_predits"] = np.round(np.maximum(0, preds), 1)
     iris_df["taux_risque_10k_hab"] = np.round(
         (iris_df["nb_signalements_predits"] / iris_df["pop_totale_iris"]) * 10000, 2
-    )
+    )  # nb de signalements pour 10000 hab 
     
     return iris_df[["code_iris", "lat", "lon", "nb_signalements_predits", "taux_risque_10k_hab"]].sort_values(
         by="nb_signalements_predits", ascending=False
