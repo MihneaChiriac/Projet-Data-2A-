@@ -1,0 +1,27 @@
+# Environments virtuels Python 
+.venv/ 
+venv/ 
+env/ 
+ENV/ 
+
+# Fichiers de cache Python &amp; Bytecode 
+__pycache__/
+*.pyc 
+*.pyo 
+*.pyd 
+.pytest_cache/ 
+
+# Fichiers d'environnement et clés d'API 
+.env 
+*.key
+
+# Fichiers système et éditeurs 
+.DS_Store 
+Thumbs.db 
+.vscode/ 
+.idea/
+
+# Fichiers temporaires ou gros volumes de données (optionnel) 
+# Si vos fichiers .parquet ou .csv dépassent 100 Mo : 
+# data/raw/ 
+# *.parquet
