@@ -2,7 +2,7 @@
 
 liens importants :
 
-### Eleve 1 :
+### Eleve 1 : Astrid 
 
 * **Commerces de bouche &amp; Restaurants (Base SIRENE)**
   * **Lien** : [data.gouv.fr - Base SIRENE des entreprises](https://www.google.com/url?sa=E&amp;q=https%3A%2F%2Fwww.data.gouv.fr%2Ffr%2Fdatasets%2Fbase-sirene-des-entreprises-et-de-leurs-etablissements-siren-siret%2F)
@@ -23,7 +23,7 @@ liens importants :
   * **Lien** : [Paris Data - Espaces verts et assimilés](https://www.google.com/url?sa=E&amp;q=https%3A%2F%2Fopendata.paris.fr%2Fexplore%2Fdataset%2Fespaces%5Fverts%2F)
   * **Usage** : Surfaçage des parcs et squares fermés/ouverts à Paris.
  
-### Eleve 2 : 
+### Eleve 2 : Louis 
 
 * **Signalements DansMaRue (Flux courant / récent)**
   * **Lien** : [Paris Data - Dans Ma Rue (Anomalies signalées)](https://www.google.com/url?sa=E&amp;q=https%3A%2F%2Fopendata.paris.fr%2Fexplore%2Fdataset%2Fdans-ma-rue%2F)
@@ -42,5 +42,5 @@ liens importants :
   * **Usage** : Récupérer la population totale par IRIS pour calculer les taux de signalement pour 10 000 habitants.
 
 
-Eleve 3 :
+### Eleve 3 : Mihnea 
 Streamlit
