@@ -111,4 +111,4 @@ def generate_mock_dataset(n_iris=50, n_days=60, output_path="mock_data.parquet")
     return grid
 
 if __name__ == "__main__":
-    generate_mock_dataset(n_iris=50, n_days=60, output_path="/workspace/scratch/mock_data.parquet")
+    generate_mock_dataset(n_iris=50, n_days=60)
