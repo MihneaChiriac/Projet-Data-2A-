@@ -61,7 +61,7 @@ def prepare_features(df):
     # Les colonnes de saisons ajoutées :
     saison_cols = ["saison_Ete", "saison_Automne", "saison_Hiver"]
     
-    X = pd.concat([df_prep[BASE_FEATURE_COLS], saison_dummies[saison_cols]], axis=1)
+    X = pd.concat([df_prep[FEATURE_COLS], saison_dummies[saison_cols]], axis=1)
     
     # Convertir les booléens
     if "pluie_veille" in X.columns and X["pluie_veille"].dtype == bool:
@@ -126,7 +126,7 @@ def predict_risk_by_quartier(model, df_iris_features, temp_max_c, pluie_veille, 
 
 if __name__ == "__main__":
     print("=== TEST DU MODULE DE PRÉDICTION LINÉAIRE AVEC SAISONS ===")
-    df_data = load_data("mock_data_linear.parquet")
+    df_data = load_data("mock_data.parquet")
     print(f"Données chargées : {len(df_data)} lignes, {df_data['code_iris'].nunique()} quartiers IRIS.")
     
     model, metrics, coef_df, intercept, feature_names = train_linear_model(df_data)
