@@ -72,16 +72,6 @@ def run_eda(file_path="mock_data.parquet"):
             print(f"\nEffet de '{col}':")
             print(group.to_string())
 
-    # 7. Recommandations pour la modélisation
-    print("\n" + "=" * 65)
-    print("      DIAGNOSTIC & PERTINENCE POUR LA MODÉLISATION")
-    print("=" * 65)
-    print("1. Complétude      : Aucune valeur manquante détectée (100% propre).")
-    print(f"2. Dispersion      : Ratio Var/Moyenne = {var_val/mean_val:.2f}.")
-    print("   -> Ratio faible/modéré, adapté à la Régression Linéaire ou Poisson.")
-    print("3. Top Réducteurs   : La distance à l'eau réduit significativement les signalements.")
-    print("4. Top Accélérateurs: Pluie la veille, marchés et fast-foods augmentent les risques.")
-    print("=" * 65)
 
 if __name__ == "__main__":
     import sys
