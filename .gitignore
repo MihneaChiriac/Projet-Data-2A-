@@ -25,3 +25,5 @@ Thumbs.db
 # Si vos fichiers .parquet ou .csv dépassent 100 Mo : 
 # data/raw/ 
 # *.parquet
+
+Data/
