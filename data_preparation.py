@@ -54,5 +54,67 @@ for i in range(12, 26):
 # CONSTRUCTION DU FICHIER PROPRE
 data_clean = pd.concat([datas[f"data20{i}"] for i in range(12,26)])
 print(data_clean.sample(n=20))
+#retouches finales:
+
+data_clean = data_clean.drop(columns=["Unnamed: 0"]) #on supprime une colonne inutile et sans info
+print(data_clean.dtypes)
+
+#pour toute colonne, afficher la proptable
+for col in data_clean.columns.drop(["ADRESSE", "X", "Y"]):
+    print(f"--- {col} ---")
+    print(data_clean[col].value_counts(normalize=True, dropna=False).round(5)*100)
+    print(f"____done:{col}____")
+
+#test présence NaN
+na_counts = data_clean.isna().sum()
+print(na_counts[na_counts > 0].sort_values(ascending=False))
+#résultat: 1 seul NaN, dans CONSEILQUARTIER
+
+#conversion en nombres
+data_clean["X"] = pd.to_numeric(data_clean["X"].str.replace(",", ".", regex=False), errors="raise")
+data_clean["Y"] = pd.to_numeric(data_clean["Y"].str.replace(",", ".", regex=False), errors="raise")
+data_clean["ARRONDISSEMENT"] = pd.to_numeric(data_clean["ARRONDISSEMENT"].str.replace(",", ".", regex=False), errors="raise")
+data_clean["CODE_POSTAL"] = pd.to_numeric(data_clean["CODE_POSTAL"].str.replace(",", ".", regex=False), errors="raise")
+
+#vérification de conversion
+print(data_clean.dtypes) #tout va bien
+
+#pour toute colonne, affiche la proptable
+for col in data_clean.columns.drop(["ADRESSE", "X", "Y"]):
+    print(f"--- {col} ---")
+    print(data_clean[col].value_counts(normalize=True, dropna=False).round(5)*100)
+    print("____done____")
+#les problèmes de type "75116" "75116.0" "75116,0000" sont résolus
+
+#test présence NaN
+na_counts = data_clean.isna().sum()
+print(na_counts[na_counts > 0].sort_values(ascending=False))
+#aucun NaN n'est apparu
+
+
+#on regarde le ID_DMR qui apparaît 2 fois, (constaté dans les proptables précédentes)
+
+#print(data_clean.loc[data_clean["ID_DMR"]=="S2017D000601",:])
+#c'est bien la même ligne, on vire le dupliqué
+print(data_clean.shape)
+data_clean = data_clean.drop_duplicates(subset="ID_DMR")
+print(data_clean.shape) #suppression effective
+
+#réunion des valeurs similaires de SOUSTYPE:
+
+#rappel distribution
+print(data_clean["SOUSTYPE"].value_counts(normalize=True, dropna=False).round(5)*100)
+
+#on réecrit les catégories
+data_clean.loc[data_clean["SOUSTYPE"] == " Présence de rats", "SOUSTYPE"] = "Présence de rats"
+data_clean.loc[data_clean["SOUSTYPE"] == " Présence de souris", "SOUSTYPE"] = "Présence de souris"
+data_clean.loc[data_clean["SOUSTYPE"].str.contains("égouts", na=False), "SOUSTYPE"] = "Rats sortant des égouts"
+
+#affichage proptable, a-ce fonctionné?
+print(data_clean["SOUSTYPE"].value_counts(normalize=True, dropna=False).round(5)*100)
+#cela a fonctionné
+
+#l'info de VILLE est redondante à celle de ARRONDISSEMENT, on supprime VILLE
+data_clean = data_clean.drop(columns=["VILLE"])
 
 data_clean.to_csv('Data/clean_rats.csv')
