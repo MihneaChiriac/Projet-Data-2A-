@@ -4,6 +4,9 @@ import plotly.express as px
 import requests
 import streamlit as st
 
+# ajout dbscan
+from DBSCAN import regrouper_points
+
 URL_ARRONDISSEMENTS = (
     "https://opendata.paris.fr/api/explore/v2.1/catalog/datasets/"
     "arrondissements/exports/geojson"
@@ -56,8 +59,38 @@ def tracer_carte(geojson: dict, risques: pd.DataFrame):
     return figure
 
 
+# ajout dbscan
+
+# points sur la carte, foyers en rouge et bruit en gris
+def tracer_foyers(signalements: pd.DataFrame):
+    figure = px.scatter_map(
+        signalements,
+        lat="lat",
+        lon="lon",
+        color="type",
+        color_discrete_map={"foyer": "red", "isolé": "grey"},
+        # numéro du foyer visible au survol
+        hover_data={"groupe": True, "type": False},
+        center=CENTRE_PARIS,
+        zoom=10.8,
+        map_style="carto-positron",
+        labels={"type": "Signalement", "groupe": "Foyer"},
+    )
+    figure.update_traces(marker={"size": 8})
+    figure.update_layout(margin={"l": 0, "r": 0, "t": 0, "b": 0})
+    return figure
+
+
 st.title("Risque par arrondissement pour les rats à Paris")
 st.warning("Données factices")
 
-carte = tracer_carte(charger_arrondissements(), creer_risque_factice())
-st.plotly_chart(carte, width="stretch")
+
+onglet_risque, onglet_dbscan = st.tabs(["Risque par arrondissement", "Foyers (DBSCAN)"])
+
+
+
+with onglet_risque:
+    st.warning("Données factices")
+
+    carte = tracer_carte(charger_arrondissements(), creer_risque_factice())
+    st.plotly_chart(carte, width="stretch")
