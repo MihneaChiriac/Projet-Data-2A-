@@ -36,6 +36,27 @@ def creer_risque_factice():
     )
 
 
+# signalements bidon : quelques foyers serrés + points éparpillés dans paris
+def creer_signalements_factices() -> pd.DataFrame:
+    generateur = np.random.default_rng(seed=42)
+    centres_foyers = [(48.8590, 2.3470), (48.8675, 2.3637), (48.8840, 2.3430)]
+    # 30 points autour de chaque centre
+    points_foyers = [
+        generateur.normal(loc=centre, scale=0.0008, size=(30, 2))
+        for centre in centres_foyers
+    ]
+    # 60 points au hasard dans un rectangle
+    points_eparpilles = np.column_stack(
+        [
+            generateur.uniform(48.83, 48.89, size=60),
+            generateur.uniform(2.28, 2.41, size=60),
+        ]
+    )
+    points = np.vstack([*points_foyers, points_eparpilles])
+    return pd.DataFrame(points, columns=["lat", "lon"])
+
+
+
 # carte de paris, couleur selon le risque
 def tracer_carte(geojson: dict, risques: pd.DataFrame):
     figure = px.choropleth_map( #choropleth = carte avec zones ccolorées
@@ -94,3 +115,22 @@ with onglet_risque:
 
     carte = tracer_carte(charger_arrondissements(), creer_risque_factice())
     st.plotly_chart(carte, width="stretch")
+
+
+with onglet_dbscan:
+    st.warning("Signalements factices")
+
+    eps_metres = st.slider("Rayon eps (mètres)", min_value=20, max_value=500, value=100, step=10)
+    min_points = st.slider("Nombre minimum de points par foyer", min_value=2, max_value=20, value=5)
+
+    signalements = creer_signalements_factices()
+    signalements["groupe"] = regrouper_points(signalements[["lat", "lon"]], eps_metres, min_points)
+    # -1 = bruit d'après dbscan
+    signalements["type"] = np.where(signalements["groupe"] == -1, "isolé", "foyer")
+
+    nb_foyers = signalements.loc[signalements["groupe"] != -1, "groupe"].nunique()
+    nb_isoles = (signalements["groupe"] == -1).sum()
+    st.write(f"{nb_foyers} foyers trouvés, {nb_isoles} signalements isolés")
+
+    st.plotly_chart(tracer_foyers(signalements), width="stretch")
+
