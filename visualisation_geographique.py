@@ -1,7 +1,6 @@
-import pandas as pd
 import geopandas as gpd
 import matplotlib.pyplot as plt
-import contextily as ctx
+import pandas as pd
 from cartiflette import carti_download
 
 data = pd.read_csv("Data/clean_rats.csv")
@@ -15,7 +14,7 @@ print(data.X.dtype)
 geop_data = gpd.GeoDataFrame(
     data, geometry=gpd.points_from_xy(data.X, data.Y), crs="EPSG:4326"
 )
-
+# on harmonise les projections
 print(geop_data.head(5))
 
 # Montrer ces points sur une carte de Paris
@@ -35,3 +34,6 @@ ax = paris_arrondissements.plot(color="white", edgecolor="black")
 geop_data.plot(ax=ax, color="red")
 plt.savefig("Outputs/-Total_rats_Paris_arr")
 plt.show()
+
+# la carte est illisible : passons en densité
+# calcul de la surface de chaque arrondissement
