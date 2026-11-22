@@ -20,7 +20,7 @@ data2025 = pd.read_csv('Data/DMR_2025.csv', sep=";", encoding='utf-8')
 datas = {f"data20{i}": globals()[f"data20{i}"] for i in range(12, 26)}
 
 
-for i in range(12,26):
+for i in range(12, 26):
     # on met tous les noms de colonnes en majuscule
     datas[f"data20{i}"].columns = datas[f"data20{i}"].columns.str.upper()
 
@@ -63,7 +63,7 @@ for i in range(12, 26):
     print(datas[f"data20{i}"].head(2))
 
 # CONSTRUCTION DU FICHIER PROPRE
-data_clean = pd.concat([datas[f"data20{i}"] for i in range(12,26)])
+data_clean = pd.concat([datas[f"data20{i}"] for i in range(12, 26)])
 print(data_clean.sample(n=20))
 
 # retouches finales:
@@ -79,14 +79,19 @@ for col in data_clean.columns.drop(["ADRESSE", "X", "Y"]):
 # test présence NaN
 na_counts = data_clean.isna().sum()
 print(na_counts[na_counts > 0].sort_values(ascending=False))
+
 # résultat: 1 seul NaN, dans CONSEILQUARTIER
-
+print('ATTENTION', data_clean.dtypes)
 # conversion en nombres
-data_clean["X"] = pd.to_numeric(data_clean["X"].str.replace(",", ".", regex=False), errors="raise")
-data_clean["Y"] = pd.to_numeric(data_clean["Y"].str.replace(",", ".", regex=False), errors="raise")
-data_clean["ARRONDISSEMENT"] = pd.to_numeric(data_clean["ARRONDISSEMENT"].str.replace(",", ".", regex=False), errors="raise")
-data_clean["CODE_POSTAL"] = pd.to_numeric(data_clean["CODE_POSTAL"].str.replace(",", ".", regex=False), errors="raise")
-
+def to_num(s: pd.Series) -> pd.Series:
+    return pd.to_numeric(
+        s.astype(str).str.strip().str.replace(",", ".", regex=False),
+        errors="coerce",
+    )
+data_clean["ARRONDISSEMENT"] = to_num(data_clean["ARRONDISSEMENT"])
+data_clean["CODE_POSTAL"] = to_num(data_clean["CODE_POSTAL"])
+data_clean["X"] = to_num(data_clean["X"]) #X: longitude
+data_clean["Y"] = to_num(data_clean["Y"]) #Y: latitude
 # vérification de conversion
 print(data_clean.dtypes)  # tout va bien
 
@@ -99,7 +104,7 @@ for col in data_clean.columns.drop(["ADRESSE", "X", "Y"]):
 
 # test présence NaN
 na_counts = data_clean.isna().sum()
-print(na_counts[na_counts > 0].sort_values(ascending=False))
+print("na counts", na_counts[na_counts > 0].sort_values(ascending=False))
 # aucun NaN n'est apparu
 
 
