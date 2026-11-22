@@ -37,3 +37,4 @@ plt.show()
 
 # la carte est illisible : passons en densité
 # calcul de la surface de chaque arrondissement
+
