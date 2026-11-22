@@ -15,16 +15,27 @@ data2023 = pd.read_csv('Data/DMR_2023.csv', sep=";", encoding='cp1252')
 data2024 = pd.read_csv('Data/DMR_2024.csv', sep=";", encoding='utf-8')
 data2025 = pd.read_csv('Data/DMR_2025.csv', sep=";", encoding='utf-8')
 
-####### HARMONISATION DES COLONNES
+# HARMONISATION DES COLONNES
 
 datas = {f"data20{i}": globals()[f"data20{i}"] for i in range(12, 26)}
 
-liste_colonnes = ["ID_DMR", "TYPE", "SOUSTYPE", "ADRESSE", "CODE_POSTAL", "VILLE", "ARRONDISSEMENT",
- "ANNEEDECL", "MOISDECL", "CONSEILQUARTIER", "X", "Y"]
 
 for i in range(12,26):
     # on met tous les noms de colonnes en majuscule
     datas[f"data20{i}"].columns = datas[f"data20{i}"].columns.str.upper()
+
+# Harmonisation des formats date
+for data in datas.values():
+    print(data.loc[3, 'DATEDECL'])
+    # On voir une forte hétérogénéité des formats de date
+    data["DATEDECL"] = pd.to_datetime(data["DATEDECL"], format="mixed", errors="coerce")
+    data["JOURDECL"] = data["DATEDECL"].dt.day
+
+
+liste_colonnes = ["ID_DMR", "TYPE", "SOUSTYPE", "ADRESSE", "CODE_POSTAL", "VILLE", "ARRONDISSEMENT",
+ "DATEDECL", "ANNEEDECL", "MOISDECL", "JOURDECL", "CONSEILQUARTIER", "X", "Y"]
+
+for i in range(12, 26):
     datas[f"data20{i}"] = datas[f"data20{i}"][liste_colonnes]
 
 
@@ -42,7 +53,7 @@ for s in sous_types_pertinents.values():
         if u not in sous_types_pertinents_uniques:
             sous_types_pertinents_uniques.append(u)
 
-''' on trouve : [' Présence de rats', ' Présence de souris', " Autres problèmes d'animaux et d'insectes : [] Rats sortant des égouts"]'''
+# on trouve : [' Présence de rats', ' Présence de souris', " Autres problèmes d'animaux et d'insectes : [] Rats sortant des égouts"]
 
 # SELECTION DES LIGNES PERTINENTES SELON LE SOUS TYPE
 
@@ -54,67 +65,67 @@ for i in range(12, 26):
 # CONSTRUCTION DU FICHIER PROPRE
 data_clean = pd.concat([datas[f"data20{i}"] for i in range(12,26)])
 print(data_clean.sample(n=20))
-#retouches finales:
 
-data_clean = data_clean.drop(columns=["Unnamed: 0"]) #on supprime une colonne inutile et sans info
+# retouches finales:
+
 print(data_clean.dtypes)
 
-#pour toute colonne, afficher la proptable
+# pour toute colonne, afficher la proptable
 for col in data_clean.columns.drop(["ADRESSE", "X", "Y"]):
     print(f"--- {col} ---")
     print(data_clean[col].value_counts(normalize=True, dropna=False).round(5)*100)
     print(f"____done:{col}____")
 
-#test présence NaN
+# test présence NaN
 na_counts = data_clean.isna().sum()
 print(na_counts[na_counts > 0].sort_values(ascending=False))
-#résultat: 1 seul NaN, dans CONSEILQUARTIER
+# résultat: 1 seul NaN, dans CONSEILQUARTIER
 
-#conversion en nombres
+# conversion en nombres
 data_clean["X"] = pd.to_numeric(data_clean["X"].str.replace(",", ".", regex=False), errors="raise")
 data_clean["Y"] = pd.to_numeric(data_clean["Y"].str.replace(",", ".", regex=False), errors="raise")
 data_clean["ARRONDISSEMENT"] = pd.to_numeric(data_clean["ARRONDISSEMENT"].str.replace(",", ".", regex=False), errors="raise")
 data_clean["CODE_POSTAL"] = pd.to_numeric(data_clean["CODE_POSTAL"].str.replace(",", ".", regex=False), errors="raise")
 
-#vérification de conversion
-print(data_clean.dtypes) #tout va bien
+# vérification de conversion
+print(data_clean.dtypes)  # tout va bien
 
-#pour toute colonne, affiche la proptable
+# pour toute colonne, affiche la proptable
 for col in data_clean.columns.drop(["ADRESSE", "X", "Y"]):
     print(f"--- {col} ---")
     print(data_clean[col].value_counts(normalize=True, dropna=False).round(5)*100)
     print("____done____")
-#les problèmes de type "75116" "75116.0" "75116,0000" sont résolus
+# les problèmes de type "75116" "75116.0" "75116,0000" sont résolus
 
-#test présence NaN
+# test présence NaN
 na_counts = data_clean.isna().sum()
 print(na_counts[na_counts > 0].sort_values(ascending=False))
-#aucun NaN n'est apparu
+# aucun NaN n'est apparu
 
 
-#on regarde le ID_DMR qui apparaît 2 fois, (constaté dans les proptables précédentes)
+# on regarde le ID_DMR qui apparaît 2 fois, (constaté dans les proptables précédentes)
 
-#print(data_clean.loc[data_clean["ID_DMR"]=="S2017D000601",:])
-#c'est bien la même ligne, on vire le dupliqué
+# print(data_clean.loc[data_clean["ID_DMR"]=="S2017D000601",:])
+# c'est bien la même ligne, on vire le dupliqué
 print(data_clean.shape)
 data_clean = data_clean.drop_duplicates(subset="ID_DMR")
-print(data_clean.shape) #suppression effective
+print(data_clean.shape)  # suppression effective
 
-#réunion des valeurs similaires de SOUSTYPE:
+# réunion des valeurs similaires de SOUSTYPE:
 
-#rappel distribution
+# rappel distribution
 print(data_clean["SOUSTYPE"].value_counts(normalize=True, dropna=False).round(5)*100)
 
-#on réecrit les catégories
+# on réecrit les catégories
 data_clean.loc[data_clean["SOUSTYPE"] == " Présence de rats", "SOUSTYPE"] = "Présence de rats"
 data_clean.loc[data_clean["SOUSTYPE"] == " Présence de souris", "SOUSTYPE"] = "Présence de souris"
 data_clean.loc[data_clean["SOUSTYPE"].str.contains("égouts", na=False), "SOUSTYPE"] = "Rats sortant des égouts"
 
-#affichage proptable, a-ce fonctionné?
+# affichage proptable, a-ce fonctionné?
 print(data_clean["SOUSTYPE"].value_counts(normalize=True, dropna=False).round(5)*100)
-#cela a fonctionné
+# cela a fonctionné
 
-#l'info de VILLE est redondante à celle de ARRONDISSEMENT, on supprime VILLE
+# l'info de VILLE est redondante à celle de ARRONDISSEMENT, on supprime VILLE
 data_clean = data_clean.drop(columns=["VILLE"])
 
 data_clean.to_csv('Data/clean_rats.csv')
