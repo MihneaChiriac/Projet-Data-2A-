@@ -105,30 +105,47 @@ saisons = ["Hiver", "Printemps", "Ete", "Automne"]
 data['SAISONDECL'] = np.select(conditions, saisons, default=None)
 
 # pour comparer avec la tendance générale :
-tendance_annuelles = data.groupby("ANNEEDECL").size()
+annees = sorted(data["ANNEEDECL"].dropna().unique())
+tendance_annuelles = (
+    data.groupby("ANNEEDECL")
+    .size()
+    .reindex(annees, fill_value=0)
+)
+
+# Les histogrammes
 fig, axes1 = plt.subplots(2, 2, figsize=(20, 16))
 plt.suptitle("Evolution du nombre de déclaration par saisons entre 2012 et 2025")
 plt.subplots_adjust(top=0.90)
 ymax_droite = tendance_annuelles.max()*1.1
+positions = np.arange(len(tendance_annuelles))
+annees = tendance_annuelles.index
 for ax, saison in zip(axes1.flat, saisons):
-    # 1er axe de gauche : effectifs par saison
-    data.loc[data["SAISONDECL"] == saison,
-             "ANNEEDECL"].value_counts().sort_index().plot.bar(ax=ax,
-                                                               color='grey',
-                                                               label='Effectifs saisonniers')
-    ax.set_xlabel("")
+    # 1er axe de gauche : effectifs par saison (les années manquantes à 0)
+    effectifs_saison = (
+        data.loc[data["SAISONDECL"] == saison, "ANNEEDECL"]
+        .value_counts()
+        .reindex(tendance_annuelles.index, fill_value=0)
+        .sort_index()
+    )
+    ax.bar(positions, effectifs_saison.values, color='grey',
+           label='Effectifs saisonniers')
     ax.set_title(saison)
-    #2e axe, pour comparer avec la tendance par an
+    ax.set_xlabel("")
+    ax.set_xticks(positions)
+    ax.set_xticklabels(annees, rotation=45)
+    # 2e axe, pour comparer avec la tendance par an
     axe2 = ax.twinx()
     axe2.plot(
-        range(len(tendance_annuelles)),
+        positions,
         tendance_annuelles.values,
-        color='red', linestyle='-', label='Effectifs toutes saisons'
+        color='red', linestyle='-',
+        linewidth=2, label='Effectifs toutes saisons'
     )
     axe2.set_ylim(0, ymax_droite)
     axe2.set_ylabel("Effectif toutes saisons")
+    axe2.set_xlim(-0.5, len(tendance_annuelles)-0.5)
 
-    # Légende : 
+    # Légende :
     h1, l1 = ax.get_legend_handles_labels()
     h2, l2 = axe2.get_legend_handles_labels()
     ax.legend(h1+h2, l1+l2, loc="upper left")
