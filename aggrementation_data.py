@@ -11,7 +11,8 @@ from scipy.spatial import cKDTree
 
 
 
-data = pd.read_csv("clean_rats.csv")
+data = pd.read_csv("clean_rats.csv") #le fichier qui arrive en sortie de data_preparation.py
+
 espaces_verts = gpd.read_file("espaces_verts.geojson")
 composteurs = gpd.read_file("dechets-menagers-points-dapport-volontaire-composteurs.geojson")
 meteo = pd.read_csv("clean_meteo.csv", index_col=0)
