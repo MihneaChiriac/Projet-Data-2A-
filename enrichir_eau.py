@@ -43,8 +43,7 @@ def enrichir_avec_eau(fichier_entree: Path, fichier_sortie: Path) -> pd.DataFram
     # erreur si une colonne de la liste n'existe pas, plutôt qu'un oubli silencieux
     rats = rats.drop(columns=COLONNES_A_SUPPRIMER)
     # sans ID_DMR, plusieurs signalements du même lieu le même jour deviennent identiques :
-    # on n'en garde qu'un
-    rats = rats.drop_duplicates()
+    # on les garde tous, chacun reste un signalement distinct
     # format imposé : une date mal écrite fait planter au lieu d'être devinée
     rats["DATEDECL"] = pd.to_datetime(rats["DATEDECL"], format="%Y-%m-%d")
     # index=False : l'ancien index, non unique, n'est pas réécrit
