@@ -15,16 +15,27 @@ data2023 = pd.read_csv('Data/DMR_2023.csv', sep=";", encoding='cp1252')
 data2024 = pd.read_csv('Data/DMR_2024.csv', sep=";", encoding='utf-8')
 data2025 = pd.read_csv('Data/DMR_2025.csv', sep=";", encoding='utf-8')
 
-####### HARMONISATION DES COLONNES
+# HARMONISATION DES COLONNES
 
 datas = {f"data20{i}": globals()[f"data20{i}"] for i in range(12, 26)}
 
-liste_colonnes = ["ID_DMR", "TYPE", "SOUSTYPE", "ADRESSE", "CODE_POSTAL", "VILLE", "ARRONDISSEMENT",
- "ANNEEDECL", "MOISDECL", "CONSEILQUARTIER", "X", "Y"]
 
-for i in range(12,26):
+for i in range(12, 26):
     # on met tous les noms de colonnes en majuscule
     datas[f"data20{i}"].columns = datas[f"data20{i}"].columns.str.upper()
+
+# Harmonisation des formats date
+for data in datas.values():
+    print(data.loc[3, 'DATEDECL'])
+    # On voir une forte hétérogénéité des formats de date
+    data["DATEDECL"] = pd.to_datetime(data["DATEDECL"], format="mixed", errors="coerce")
+    data["JOURDECL"] = data["DATEDECL"].dt.day
+
+
+liste_colonnes = ["ID_DMR", "TYPE", "SOUSTYPE", "ADRESSE", "CODE_POSTAL", "VILLE", "ARRONDISSEMENT",
+ "DATEDECL", "ANNEEDECL", "MOISDECL", "JOURDECL", "CONSEILQUARTIER", "X", "Y"]
+
+for i in range(12, 26):
     datas[f"data20{i}"] = datas[f"data20{i}"][liste_colonnes]
 
 
@@ -42,7 +53,7 @@ for s in sous_types_pertinents.values():
         if u not in sous_types_pertinents_uniques:
             sous_types_pertinents_uniques.append(u)
 
-''' on trouve : [' Présence de rats', ' Présence de souris', " Autres problèmes d'animaux et d'insectes : [] Rats sortant des égouts"]'''
+# on trouve : [' Présence de rats', ' Présence de souris', " Autres problèmes d'animaux et d'insectes : [] Rats sortant des égouts"]
 
 # SELECTION DES LIGNES PERTINENTES SELON LE SOUS TYPE
 
@@ -52,8 +63,10 @@ for i in range(12, 26):
     print(datas[f"data20{i}"].head(2))
 
 # CONSTRUCTION DU FICHIER PROPRE
-data_clean = pd.concat([datas[f"data20{i}"] for i in range(12,26)])
+data_clean = pd.concat([datas[f"data20{i}"] for i in range(12, 26)])
 print(data_clean.sample(n=20))
+
+# retouches finales:
 
 #retouches finales:
 print("____________DEBUT MODIF LOUIS____________")
@@ -62,16 +75,15 @@ print(data_clean.dtypes)
 print(list(data_clean.columns.values))
 print(data_clean.shape)
 
-#pour toute colonne, afficher la proptable
+# pour toute colonne, afficher la proptable
 for col in data_clean.columns.drop(["ADRESSE", "X", "Y"]):
     print(f"--- {col} ---")
     print(data_clean[col].value_counts(normalize=True, dropna=False).round(5)*100)
     print(f"____done: {col}____")
 
-#test présence NaN
+# test présence NaN
 na_counts = data_clean.isna().sum()
 print(na_counts[na_counts > 0].sort_values(ascending=False))
-#résultat: 1 seul NaN, dans CONSEILQUARTIER
 
 #conversion en nombres
 
@@ -80,12 +92,24 @@ def to_num(s: pd.Series) -> pd.Series:
         s.astype(str).str.strip().str.replace(",", ".", regex=False),
         errors="coerce",
     )
-
-
 data_clean["ARRONDISSEMENT"] = to_num(data_clean["ARRONDISSEMENT"])
 data_clean["CODE_POSTAL"] = to_num(data_clean["CODE_POSTAL"])
 data_clean["X"] = to_num(data_clean["X"]) #X: longitude
 data_clean["Y"] = to_num(data_clean["Y"]) #Y: latitude
+# vérification de conversion
+print(data_clean.dtypes)  # tout va bien
+
+# pour toute colonne, affiche la proptable
+for col in data_clean.columns.drop(["ADRESSE", "X", "Y"]):
+    print(f"--- {col} ---")
+    print(data_clean[col].value_counts(normalize=True, dropna=False).round(5)*100)
+    print("____done____")
+# les problèmes de type "75116" "75116.0" "75116,0000" sont résolus
+
+# test présence NaN
+na_counts = data_clean.isna().sum()
+print("na counts", na_counts[na_counts > 0].sort_values(ascending=False))
+# aucun NaN n'est apparu
 
 #vérification opération conversion:
 #print(data_clean["ARRONDISSEMENT"].value_counts(normalize=True, dropna=False).round(5)*100) #vérification valeurs
@@ -94,21 +118,20 @@ data_clean["Y"] = to_num(data_clean["Y"]) #Y: latitude
 #print(na_counts[na_counts > 0].sort_values(ascending=False)) #vérification NaN, aucun n'est apparu
 #print(data_clean.dtypes) #vérification types
 
-
-
-
-
 # on regarde le ID_DMR qui apparaît 2 fois, (constaté dans les proptables précédentes)
+
 # print(data_clean.loc[data_clean["ID_DMR"]=="S2017D000601",:])
 # c'est bien la même ligne, on vire le dupliqué
+print(data_clean.shape)
 data_clean = data_clean.drop_duplicates(subset="ID_DMR")
-# print(data_clean.shape) #suppression a fonctionné
-
+print(data_clean.shape)  # suppression effective
 
 # réunion des valeurs similaires de SOUSTYPE:
-# print(data_clean["SOUSTYPE"].value_counts(normalize=True, dropna=False).round(5)*100) #rappel distribution
-# on réecrit les catégories
 
+# rappel distribution
+print(data_clean["SOUSTYPE"].value_counts(normalize=True, dropna=False).round(5)*100)
+
+# on réecrit les catégories
 data_clean.loc[data_clean["SOUSTYPE"] == " Présence de rats", "SOUSTYPE"] = "Présence de rats"
 data_clean.loc[data_clean["SOUSTYPE"] == " Présence de souris", "SOUSTYPE"] = "Présence de souris"
 data_clean.loc[data_clean["SOUSTYPE"].str.contains("égouts", na=False), "SOUSTYPE"] = "Rats sortant des égouts"
