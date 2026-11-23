@@ -68,21 +68,25 @@ print(data_clean.sample(n=20))
 
 # retouches finales:
 
+#retouches finales:
+print("____________DEBUT MODIF LOUIS____________")
+#data_clean = data_clean.drop(columns=["Unnamed: 0"]) #on supprime une colonne inutile et sans info
 print(data_clean.dtypes)
+print(list(data_clean.columns.values))
+print(data_clean.shape)
 
 # pour toute colonne, afficher la proptable
 for col in data_clean.columns.drop(["ADRESSE", "X", "Y"]):
     print(f"--- {col} ---")
     print(data_clean[col].value_counts(normalize=True, dropna=False).round(5)*100)
-    print(f"____done:{col}____")
+    print(f"____done: {col}____")
 
 # test présence NaN
 na_counts = data_clean.isna().sum()
 print(na_counts[na_counts > 0].sort_values(ascending=False))
 
-# résultat: 1 seul NaN, dans CONSEILQUARTIER
-print('ATTENTION', data_clean.dtypes)
-# conversion en nombres
+#conversion en nombres
+
 def to_num(s: pd.Series) -> pd.Series:
     return pd.to_numeric(
         s.astype(str).str.strip().str.replace(",", ".", regex=False),
@@ -107,6 +111,12 @@ na_counts = data_clean.isna().sum()
 print("na counts", na_counts[na_counts > 0].sort_values(ascending=False))
 # aucun NaN n'est apparu
 
+#vérification opération conversion:
+#print(data_clean["ARRONDISSEMENT"].value_counts(normalize=True, dropna=False).round(5)*100) #vérification valeurs
+#print(data_clean["CODE_POSTAL"].value_counts(normalize=True, dropna=False).round(5)*100) #vérification valeurs
+#na_counts = data_clean.isna().sum()
+#print(na_counts[na_counts > 0].sort_values(ascending=False)) #vérification NaN, aucun n'est apparu
+#print(data_clean.dtypes) #vérification types
 
 # on regarde le ID_DMR qui apparaît 2 fois, (constaté dans les proptables précédentes)
 
@@ -126,11 +136,20 @@ data_clean.loc[data_clean["SOUSTYPE"] == " Présence de rats", "SOUSTYPE"] = "Pr
 data_clean.loc[data_clean["SOUSTYPE"] == " Présence de souris", "SOUSTYPE"] = "Présence de souris"
 data_clean.loc[data_clean["SOUSTYPE"].str.contains("égouts", na=False), "SOUSTYPE"] = "Rats sortant des égouts"
 
-# affichage proptable, a-ce fonctionné?
+# affichage proptable, a-ce fonctionné? oui!
 print(data_clean["SOUSTYPE"].value_counts(normalize=True, dropna=False).round(5)*100)
-# cela a fonctionné
+
 
 # l'info de VILLE est redondante à celle de ARRONDISSEMENT, on supprime VILLE
 data_clean = data_clean.drop(columns=["VILLE"])
+
+# final check:
+print(data_clean.dtypes)
+print(data_clean.shape)
+for col in data_clean.columns.drop(["ADRESSE", "X", "Y"]):
+    print(f"--- CHECK FINAL: {col} ---")
+    print(data_clean[col].value_counts(normalize=True, dropna=False).round(5)*100)
+    print(f"____FIN CHECK FINAL: {col}____")
+# tout paraît ok
 
 data_clean.to_csv('Data/clean_rats.csv')

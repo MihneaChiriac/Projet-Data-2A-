@@ -1,146 +1,193 @@
-import pandas as pd
+from pathlib import Path
+
 import numpy as np
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-import os
+import pandas as pd
+import statsmodels.api as sm
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+
+DOSSIER = Path(__file__).parent
+FICHIER_RATS_COMPLET = DOSSIER / "clean_rats_complet.csv"
+FICHIER_METEO = DOSSIER / "clean_meteo.csv"
+
+CIBLE = "nb_signalements"
+ARRONDISSEMENTS = list(range(1, 21))
+SAISONS = ["Printemps", "Ete", "Automne", "Hiver"]
+SAISON_PAR_MOIS = {
+    12: "Hiver", 1: "Hiver", 2: "Hiver",
+    3: "Printemps", 4: "Printemps", 5: "Printemps",
+    6: "Ete", 7: "Ete", 8: "Ete",
+    9: "Automne", 10: "Automne", 11: "Automne",
+}
+# modalités de référence, sans indicatrice dans le modèle
+SAISON_REFERENCE = "Printemps"
+ARRONDISSEMENT_REFERENCE = 1
+VARIABLES_METEO = ["MAX_TEMPERATURE_C", "pluie_veille"]
+# un jour compte comme pluvieux à partir de 1 mm
+SEUIL_PLUIE_MM = 1.0
+# avant 2016, très peu de signalements (au plus 218 par an)
+DATE_DEBUT = "2016-01-01"
+# prévision hors échantillon : apprentissage avant cette date, test à partir de cette date
+DATE_DEBUT_TEST = "2024-01-01"
 
 
-# A changer pour le vrai modèle
-#chaque individu est un signalement à une date précise
-#j'ai pas mis les quartiers car cela rajouterait de la colinéarité dans le modèle
+def charger_signalements(fichier: Path) -> pd.DataFrame:
+    """Lit les signalements nettoyés, avec la date en datetime et l'arrondissement en entier."""
+    rats = pd.read_csv(fichier, parse_dates=["DATEDECL"])
+    rats["ARRONDISSEMENT"] = rats["ARRONDISSEMENT"].astype(int)
+    return rats
 
-FEATURE_COLS = [
-    "nb_restos_fastfood",
-    "temp_max_c",
-    "pluie_veille",
-    "presence_marche_jour",
-    "nb_chantiers_actifs",
-    "dist_eau_m",
-    "pop_totale_iris"
-]
 
-TARGET_COL = "nb_signalements"
+def charger_meteo(fichier: Path) -> pd.DataFrame:
+    """Lit la météo journalière et ajoute pluie_veille (1 si la veille a reçu au moins SEUIL_PLUIE_MM).
 
-def derive_saison(df):
-    df_out = df.copy()
-    if "saison" not in df_out.columns:
-        if "mois" in df_out.columns:
-            mois_series = df_out["mois"]
-        elif "date" in df_out.columns:
-            mois_series = pd.to_datetime(df_out["date"]).dt.month
-        else:
-            mois_series = pd.Series(6, index=df_out.index) # Par défaut été
-            
-        def mois_to_saison(m):
-            if m in [12, 1, 2]:
-                return "Hiver"
-            elif m in [3, 4, 5]:
-                return "Printemps"
-            elif m in [6, 7, 8]:
-                return "Ete"
-            else:
-                return "Automne"
-                
-        df_out["saison"] = mois_series.apply(mois_to_saison)
-    return df_out
-
-def prepare_features(df):
+    Renvoie DATE, MAX_TEMPERATURE_C et pluie_veille, sans le premier jour (veille inconnue).
     """
-    Prépare le DataFrame avec l'encodage One-Hot des saisons (base = Printemps) (on le met donc pas).
-    """
-    df_prep = derive_saison(df)
-    
-    # Encodage One-Hot pour la saison
-    saison_dummies = pd.get_dummies(df_prep["saison"], prefix="saison", dtype=int)
-    
-    # S'assurer que toutes les colonnes de saison sont présentes
-    for s in ["saison_Automne", "saison_Ete", "saison_Hiver", "saison_Printemps"]:
-        if s not in saison_dummies.columns:
-            saison_dummies[s] = 0
-            
-    # Les colonnes de saisons ajoutées :
-    saison_cols = ["saison_Ete", "saison_Automne", "saison_Hiver"]
-    
-    X = pd.concat([df_prep[FEATURE_COLS], saison_dummies[saison_cols]], axis=1)
-    
-    # Convertir les booléens
-    if "pluie_veille" in X.columns and X["pluie_veille"].dtype == bool:
-        X["pluie_veille"] = X["pluie_veille"].astype(int)
-    if "presence_marche_jour" in X.columns and X["presence_marche_jour"].dtype == bool:
-        X["presence_marche_jour"] = X["presence_marche_jour"].astype(int)
-        
-    return X, saison_cols
+    meteo = pd.read_csv(fichier, parse_dates=["DATE"]).sort_values("DATE")
+    # shift(1) ne donne la veille que s'il y a exactement un jour par ligne, sans trou
+    if not meteo["DATE"].diff().iloc[1:].eq(pd.Timedelta(days=1)).all():
+        raise ValueError("la météo doit contenir chaque jour exactement une fois")
+    meteo["pluie_veille"] = (meteo["PRECIP_TOTAL_DAY_MM"].shift(1) >= SEUIL_PLUIE_MM).astype(int)
+    return meteo.iloc[1:][["DATE", *VARIABLES_METEO]]
 
-def load_data(file_path="mock_data_linear.parquet"):
-    return pd.read_parquet(file_path)
 
-def train_linear_model(df):
- 
-    X, saison_cols = prepare_features(df)
-    y = df[TARGET_COL]
+def construire_panel(rats: pd.DataFrame, meteo: pd.DataFrame) -> pd.DataFrame:
+    """Une ligne par jour et par arrondissement, avec le nombre de signalements (0 si aucun) et la météo du jour."""
+    comptes = rats.groupby(["DATEDECL", "ARRONDISSEMENT"]).size()
+    comptes.index.names = ["DATE", "ARRONDISSEMENT"]
+    # toutes les combinaisons jour x arrondissement, pour garder les jours sans signalement
+    toutes = pd.MultiIndex.from_product([meteo["DATE"], ARRONDISSEMENTS], names=["DATE", "ARRONDISSEMENT"])
+    panel = comptes.reindex(toutes, fill_value=0).rename(CIBLE).reset_index()
+    # vérif : aucun signalement perdu (date hors météo ou arrondissement hors 1-20)
+    if panel[CIBLE].sum() != len(rats):
+        raise ValueError("des signalements ne sont pas dans le panel")
+    panel = panel.merge(meteo, on="DATE", how="left", validate="many_to_one")
+    panel["saison"] = panel["DATE"].dt.month.map(SAISON_PAR_MOIS)
+    return panel
 
-    feature_names = list(X.columns)
 
-    model = LinearRegression()
-    model.fit(X, y)
-    
-    y_pred = np.maximum(0, model.predict(X))
-    
-    metrics = {
-        "r2": r2_score(y, y_pred),
-        "rmse": np.sqrt(mean_squared_error(y, y_pred)),
-        "mae": mean_absolute_error(y, y_pred)
-    }
-    
-    coef_df = pd.DataFrame({
-        "Feature": feature_names,
-        "Coefficient": model.coef_
-    }).sort_values(by="Coefficient", ascending=False)
-    
-    return model, metrics, coef_df, model.intercept_, feature_names
+def filtrer_periode(panel: pd.DataFrame, debut: str, fin: str | None = None) -> pd.DataFrame:
+    """Lignes du panel dont la DATE est dans [debut, fin[ ; fin=None pour aller jusqu'à la dernière date."""
+    garde = panel["DATE"] >= debut
+    if fin is not None:
+        garde &= panel["DATE"] < fin
+    return panel[garde]
 
-def predict_risk_by_quartier(model, df_iris_features, temp_max_c, pluie_veille, saison="Ete"):
-    iris_df = df_iris_features.drop_duplicates(subset=["code_iris"]).copy()
-    
-    iris_df["temp_max_c"] = temp_max_c
-    iris_df["pluie_veille"] = int(pluie_veille)
-    iris_df["saison"] = saison
-    
-    if "presence_marche_jour" not in iris_df.columns:
-        iris_df["presence_marche_jour"] = 0
-    if "nb_chantiers_actifs" not in iris_df.columns:
-        iris_df["nb_chantiers_actifs"] = 0
-        
-    X_input, _ = prepare_features(iris_df)
-    
-    preds = model.predict(X_input)
-    
-    iris_df["nb_signalements_predits"] = np.round(np.maximum(0, preds), 1)
-    iris_df["taux_risque_10k_hab"] = np.round(
-        (iris_df["nb_signalements_predits"] / iris_df["pop_totale_iris"]) * 10000, 2
-    )  # nb de signalements pour 10000 hab 
-    
-    return iris_df[["code_iris", "lat", "lon", "nb_signalements_predits", "taux_risque_10k_hab"]].sort_values(
-        by="nb_signalements_predits", ascending=False
+
+def indicatrices(valeurs: pd.Series, modalites: list, prefixe: str, reference) -> pd.DataFrame:
+    """Indicatrices 0/1 de toutes les modalités sauf la référence, même si certaines sont absentes de valeurs."""
+    # catégories fixées : mêmes colonnes à l'estimation et à la prédiction
+    categories = pd.Series(pd.Categorical(valeurs, categories=modalites), index=valeurs.index)
+    return pd.get_dummies(categories, prefix=prefixe, dtype=int).drop(columns=f"{prefixe}_{reference}")
+
+
+def preparer_variables(df: pd.DataFrame) -> pd.DataFrame:
+    """Matrice des variables explicatives : constante, météo, saisons et arrondissements."""
+    X = pd.concat(
+        [
+            df[VARIABLES_METEO],
+            indicatrices(df["saison"], SAISONS, "saison", SAISON_REFERENCE),
+            indicatrices(df["ARRONDISSEMENT"], ARRONDISSEMENTS, "arr", ARRONDISSEMENT_REFERENCE),
+        ],
+        axis=1,
     )
+    # has_constant="add" : sinon la constante est sautée si une colonne est constante (cas d'une prédiction)
+    return sm.add_constant(X, has_constant="add")
+
+
+def estimer_modele(panel: pd.DataFrame):
+    """Régression linéaire (MCO) de CIBLE, écarts-types robustes à l'hétéroscédasticité (HC1)."""
+    return sm.OLS(panel[CIBLE], preparer_variables(panel)).fit(cov_type="HC1")
+
+
+def tableau_coefficients(resultat) -> pd.DataFrame:
+    """Beta, écart-type et p-valeur de chaque variable."""
+    return pd.DataFrame({"beta": resultat.params, "ecart_type": resultat.bse, "p_valeur": resultat.pvalues})
+
+
+def tests_joints(resultat) -> pd.DataFrame:
+    """Test de Wald (statistique F) que tous les coefficients d'un groupe de variables sont nuls."""
+    noms = resultat.model.exog_names
+    groupes = {
+        "global (toutes sauf constante)": [nom for nom in noms if nom != "const"],
+        "meteo": VARIABLES_METEO,
+        "saisons": [nom for nom in noms if nom.startswith("saison_")],
+        "arrondissements": [nom for nom in noms if nom.startswith("arr_")],
+    }
+    lignes = []
+    for groupe, variables in groupes.items():
+        test = resultat.f_test(", ".join(f"{variable} = 0" for variable in variables))
+        lignes.append({
+            "groupe": groupe,
+            "nb_contraintes": len(variables),
+            "F": np.asarray(test.fvalue).item(),
+            "p_valeur": np.asarray(test.pvalue).item(),
+        })
+    return pd.DataFrame(lignes)
+
+
+def evaluer_prevision(panel: pd.DataFrame, debut_test: str) -> pd.DataFrame:
+    """Erreurs de prévision hors échantillon : modèle estimé avant debut_test, évalué à partir de debut_test.
+
+    La référence prédit, pour chaque arrondissement, sa moyenne sur la période d'apprentissage :
+    elle mesure ce qu'apportent la météo et la saison.
+    """
+    apprentissage = filtrer_periode(panel, panel["DATE"].min(), debut_test)
+    test = filtrer_periode(panel, debut_test)
+    modele = estimer_modele(apprentissage)
+    predictions = {
+        # comme pour la simulation, une prédiction négative est ramenée à 0
+        "modele": np.maximum(0, modele.predict(preparer_variables(test))),
+        "reference (moyenne par arrondissement)": test["ARRONDISSEMENT"].map(
+            apprentissage.groupby("ARRONDISSEMENT")[CIBLE].mean()
+        ),
+    }
+    return pd.DataFrame([
+        {
+            "prediction": nom,
+            "R2_test": r2_score(test[CIBLE], prevu),
+            "RMSE_test": np.sqrt(mean_squared_error(test[CIBLE], prevu)),
+            "MAE_test": mean_absolute_error(test[CIBLE], prevu),
+        }
+        for nom, prevu in predictions.items()
+    ])
+
+
+def predire_risque_par_arrondissement(resultat, temp_max_c: float, pluie_veille: bool, saison: str) -> pd.DataFrame:
+    """Nombre de signalements prédit dans chaque arrondissement pour un jour aux conditions données."""
+    jour = pd.DataFrame({"ARRONDISSEMENT": ARRONDISSEMENTS})
+    jour["MAX_TEMPERATURE_C"] = temp_max_c
+    jour["pluie_veille"] = int(pluie_veille)
+    jour["saison"] = saison
+    # un modèle linéaire peut prédire un nombre négatif : ramené à 0
+    jour["nb_signalements_predits"] = np.maximum(0, resultat.predict(preparer_variables(jour))).round(3)
+    return jour[["ARRONDISSEMENT", "nb_signalements_predits"]].sort_values(
+        "nb_signalements_predits", ascending=False
+    ).reset_index(drop=True)
+
 
 if __name__ == "__main__":
-    print("=== TEST DU MODULE DE PRÉDICTION LINÉAIRE AVEC SAISONS ===")
-    df_data = load_data("mock_data.parquet")
-    print(f"Données chargées : {len(df_data)} lignes, {df_data['code_iris'].nunique()} quartiers IRIS.")
-    
-    model, metrics, coef_df, intercept, feature_names = train_linear_model(df_data)
-    
-    print("\n--- Performances du modèle ---")
-    print(f"Intercept (Constante) : {intercept:.3f}")
-    print(f"R² Score : {metrics['r2']:.4f}")
-    print(f"RMSE     : {metrics['rmse']:.3f}")
-    print(f"MAE      : {metrics['mae']:.3f}")
-    
-    print("\n--- Coefficients appris (Poids des facteurs & Saisons) ---")
-    print(coef_df.to_string(index=False))
-    
-    print("\n--- Simulation : Journée d'Été à 25°C avec pluie la veille ---")
-    sim_res = predict_risk_by_quartier(model, df_data, temp_max_c=25.0, pluie_veille=True, saison="Ete")
-    print("\nTop 5 des quartiers les plus à risque prédits :")
-    print(sim_res.head().to_string(index=False))
+    rats = charger_signalements(FICHIER_RATS_COMPLET)
+    meteo = charger_meteo(FICHIER_METEO)
+    panel = filtrer_periode(construire_panel(rats, meteo), DATE_DEBUT)
+    resultat = estimer_modele(panel)
+
+    print("=== RÉGRESSION LINÉAIRE : signalements par arrondissement et par jour ===")
+    print(f"Observations : {int(resultat.nobs)} ({panel['DATE'].nunique()} jours x {len(ARRONDISSEMENTS)} arrondissements)")
+    print(f"Période      : {panel['DATE'].min():%Y-%m-%d} -> {panel['DATE'].max():%Y-%m-%d}")
+    print(f"Moyenne de {CIBLE} : {panel[CIBLE].mean():.4f}")
+    print(f"R²           : {resultat.rsquared:.4f}")
+    print(f"Références   : saison {SAISON_REFERENCE}, arrondissement {ARRONDISSEMENT_REFERENCE}")
+    print("Écarts-types robustes à l'hétéroscédasticité (HC1)")
+
+    print("\n--- Coefficients ---")
+    print(tableau_coefficients(resultat).to_string(float_format=lambda x: f"{x:.4g}"))
+
+    print("\n--- Tests joints (Wald, H0 : tous les coefficients du groupe sont nuls) ---")
+    print(tests_joints(resultat).to_string(index=False, float_format=lambda x: f"{x:.4g}"))
+
+    print("\n--- Simulation : jour d'été à 25 °C avec pluie la veille ---")
+    print(predire_risque_par_arrondissement(resultat, temp_max_c=25.0, pluie_veille=True, saison="Ete").head().to_string(index=False))
+
+    print(f"\n--- Prévision hors échantillon (apprentissage {DATE_DEBUT} -> {DATE_DEBUT_TEST} exclu, test ensuite) ---")
+    print(f"Part de zéros sur la période de test : {(filtrer_periode(panel, DATE_DEBUT_TEST)[CIBLE] == 0).mean():.1%}")
+    print(evaluer_prevision(panel, DATE_DEBUT_TEST).to_string(index=False, float_format=lambda x: f"{x:.4f}"))
