@@ -77,7 +77,7 @@ for i, moyenne in enumerate(moyennes):
         linewidth=2,
         label='Moyenne mensuelle' if i == 0 else None
     )
-axe.set_title('Moyenne du nombre de signalements par mois')
+axe.set_title('Nombre de signalements par mois')
 axe.set_xlabel("Mois")
 axe.set_ylabel("Moyenne des signalements mensuels")
 handles, labels = axe.get_legend_handles_labels()
