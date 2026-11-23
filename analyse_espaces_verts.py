@@ -24,7 +24,7 @@ rng = np.random.default_rng(0)
 # 1. CHARGEMENT DES DONNÉES
 # ---------------------------------------------------------------
 espaces_verts = gpd.read_file('espaces_verts.geojson')    # polygones (EPSG:4326)
-data = pd.read_csv('clean_rats_date_clean.csv')
+data = pd.read_csv('clean_rats.csv')
 
 points = gpd.GeoDataFrame(
     data,
