@@ -4,6 +4,9 @@ La légende urbaine veut que plus de 5 millions de rats vivent à Paris. Pour li
 
 Ce projet cherche à savoir s'il est possible de « prédire » la présence d'un rat à un moment donné, à un lieu donné. Aux dates et aux coordonnées GPS des signalements de rats de Dans Ma Rue entre 2012 et 2025, nous ajoutons des données météorologiques et géographiques adaptées à l'espace urbain parisien : surfaces d'eau de l'IGN, espaces verts, composteurs, grille de carreaux de 200 m. À elles seules, ces variables suffisent-elles à prédire le prochain signalement de rat ?
 
+## Emplacement des données
+Les données brutes (historiques météos, DMR, espaces_verts, cours_d'eau, déchets_ménagers) vont dans le fichier "données"
+
 ## Lire le projet
 
 Toute l'analyse se trouve dans le notebook `notebook.ipynb`, à lire dans l'ordre. Il présente les fichiers du dépôt au début.
