@@ -6,7 +6,7 @@ Ce projet cherche à savoir s'il est possible de « prédire » la présence d'u
 
 ## Lire le projet
 
-Toute l'analyse se trouve dans le notebook `notebook_corrigé.ipynb`, à lire dans l'ordre. Il présente les fichiers du dépôt au début.
+Toute l'analyse se trouve dans le notebook `notebook.ipynb`, à lire dans l'ordre. Il présente les fichiers du dépôt au début.
 
 ## Tester l'application
 
@@ -14,7 +14,7 @@ Depuis la racine du dépôt, installer les dépendances (testé avec Python 3.12
 
 ```
 python -m pip install -r requirements.txt
-streamlit run app.py
+python -m streamlit run app.py
 ```
 
 L'application s'ouvre dans le navigateur. Elle lit `données/clean_rats.csv` et `données/clean_meteo.csv`, et a besoin d'une connexion internet pour la météo du jour et les contours des arrondissements.
