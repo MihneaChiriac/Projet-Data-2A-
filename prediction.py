@@ -5,9 +5,9 @@ import pandas as pd
 import statsmodels.api as sm
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
-DOSSIER = Path(__file__).parent
-FICHIER_RATS_COMPLET = DOSSIER / "clean_rats_complet.csv"
-FICHIER_METEO = DOSSIER / "clean_meteo.csv"
+DOSSIER_DONNEES = Path(__file__).parent / "données"
+FICHIER_RATS_COMPLET = DOSSIER_DONNEES / "clean_rats_complet.csv"
+FICHIER_METEO = DOSSIER_DONNEES / "clean_meteo.csv"
 
 CIBLE = "nb_signalements"
 ARRONDISSEMENTS = list(range(1, 21))
@@ -31,17 +31,12 @@ DATE_DEBUT_TEST = "2024-01-01"
 
 
 def charger_signalements(fichier: Path) -> pd.DataFrame:
-    """Lit les signalements nettoyés, avec la date en datetime et l'arrondissement en entier."""
     rats = pd.read_csv(fichier, parse_dates=["DATEDECL"])
     rats["ARRONDISSEMENT"] = rats["ARRONDISSEMENT"].astype(int)
     return rats
 
 
 def charger_meteo(fichier: Path) -> pd.DataFrame:
-    """Lit la météo journalière et ajoute pluie_veille (1 si la veille a reçu au moins SEUIL_PLUIE_MM).
-
-    Renvoie DATE, MAX_TEMPERATURE_C et pluie_veille, sans le premier jour (veille inconnue).
-    """
     meteo = pd.read_csv(fichier, parse_dates=["DATE"]).sort_values("DATE")
     # shift(1) ne donne la veille que s'il y a exactement un jour par ligne, sans trou
     if not meteo["DATE"].diff().iloc[1:].eq(pd.Timedelta(days=1)).all():
@@ -51,7 +46,6 @@ def charger_meteo(fichier: Path) -> pd.DataFrame:
 
 
 def construire_panel(rats: pd.DataFrame, meteo: pd.DataFrame) -> pd.DataFrame:
-    """Une ligne par jour et par arrondissement, avec le nombre de signalements (0 si aucun) et la météo du jour."""
     comptes = rats.groupby(["DATEDECL", "ARRONDISSEMENT"]).size()
     comptes.index.names = ["DATE", "ARRONDISSEMENT"]
     # toutes les combinaisons jour x arrondissement, pour garder les jours sans signalement
@@ -66,7 +60,6 @@ def construire_panel(rats: pd.DataFrame, meteo: pd.DataFrame) -> pd.DataFrame:
 
 
 def filtrer_periode(panel: pd.DataFrame, debut: str, fin: str | None = None) -> pd.DataFrame:
-    """Lignes du panel dont la DATE est dans [debut, fin[ ; fin=None pour aller jusqu'à la dernière date."""
     garde = panel["DATE"] >= debut
     if fin is not None:
         garde &= panel["DATE"] < fin
@@ -74,14 +67,12 @@ def filtrer_periode(panel: pd.DataFrame, debut: str, fin: str | None = None) -> 
 
 
 def indicatrices(valeurs: pd.Series, modalites: list, prefixe: str, reference) -> pd.DataFrame:
-    """Indicatrices 0/1 de toutes les modalités sauf la référence, même si certaines sont absentes de valeurs."""
     # catégories fixées : mêmes colonnes à l'estimation et à la prédiction
     categories = pd.Series(pd.Categorical(valeurs, categories=modalites), index=valeurs.index)
     return pd.get_dummies(categories, prefix=prefixe, dtype=int).drop(columns=f"{prefixe}_{reference}")
 
 
 def preparer_variables(df: pd.DataFrame) -> pd.DataFrame:
-    """Matrice des variables explicatives : constante, météo, saisons et arrondissements."""
     X = pd.concat(
         [
             df[VARIABLES_METEO],
@@ -95,17 +86,14 @@ def preparer_variables(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def estimer_modele(panel: pd.DataFrame):
-    """Régression linéaire (MCO) de CIBLE, écarts-types robustes à l'hétéroscédasticité (HC1)."""
     return sm.OLS(panel[CIBLE], preparer_variables(panel)).fit(cov_type="HC1")
 
 
 def tableau_coefficients(resultat) -> pd.DataFrame:
-    """Beta, écart-type et p-valeur de chaque variable."""
     return pd.DataFrame({"beta": resultat.params, "ecart_type": resultat.bse, "p_valeur": resultat.pvalues})
 
 
 def tests_joints(resultat) -> pd.DataFrame:
-    """Test de Wald (statistique F) que tous les coefficients d'un groupe de variables sont nuls."""
     noms = resultat.model.exog_names
     groupes = {
         "global (toutes sauf constante)": [nom for nom in noms if nom != "const"],
@@ -126,11 +114,6 @@ def tests_joints(resultat) -> pd.DataFrame:
 
 
 def evaluer_prevision(panel: pd.DataFrame, debut_test: str) -> pd.DataFrame:
-    """Erreurs de prévision hors échantillon : modèle estimé avant debut_test, évalué à partir de debut_test.
-
-    La référence prédit, pour chaque arrondissement, sa moyenne sur la période d'apprentissage :
-    elle mesure ce qu'apportent la météo et la saison.
-    """
     apprentissage = filtrer_periode(panel, panel["DATE"].min(), debut_test)
     test = filtrer_periode(panel, debut_test)
     modele = estimer_modele(apprentissage)
@@ -153,7 +136,6 @@ def evaluer_prevision(panel: pd.DataFrame, debut_test: str) -> pd.DataFrame:
 
 
 def predire_risque_par_arrondissement(resultat, temp_max_c: float, pluie_veille: bool, saison: str) -> pd.DataFrame:
-    """Nombre de signalements prédit dans chaque arrondissement pour un jour aux conditions données."""
     jour = pd.DataFrame({"ARRONDISSEMENT": ARRONDISSEMENTS})
     jour["MAX_TEMPERATURE_C"] = temp_max_c
     jour["pluie_veille"] = int(pluie_veille)

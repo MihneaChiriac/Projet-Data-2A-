@@ -21,21 +21,3 @@ def regrouper_points(points, eps_metres=100, min_points=5):
         algorithm="ball_tree",
     )
     return modele.fit_predict(coordonnees)
-
-
-# petit test avec des points inventés
-if __name__ == "__main__":
-    points_test = [
-        # 4 points proches 
-        (48.8590, 2.3470),
-        (48.8593, 2.3472),
-        (48.8588, 2.3475),
-        (48.8591, 2.3467),
-        #4 points proches
-        (48.8675, 2.3637),
-        (48.8677, 2.3640),
-        (48.8673, 2.3634),
-        # 1 point isolé
-        (48.8400, 2.3000),
-    ]
-    print(regrouper_points(points_test, eps_metres=100, min_points=3))

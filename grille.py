@@ -1,5 +1,4 @@
 from math import cos, radians
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -11,7 +10,6 @@ URL_ARRONDISSEMENTS = (
     "https://opendata.paris.fr/api/explore/v2.1/catalog/datasets/"
     "arrondissements/exports/geojson"
 )
-DOSSIER_DONNEES = Path(__file__).parent / "data"
 
 TAILLE_CARREAU_M = 200
 # coin sud-ouest de la grille, un peu en dehors de paris
@@ -73,5 +71,4 @@ def rattacher_aux_carreaux(points: pd.DataFrame, carreaux: pd.DataFrame) -> pd.S
     ids = identifiant(lignes, colonnes)
     # vide si le point tombe hors des carreaux gardés
     return ids.where(ids.isin(carreaux["carreau"]))
-
 

@@ -29,14 +29,12 @@ ECART_MAX_TOLERE_M = 1.0
 
 
 def telecharger_espaces_verts() -> list:
-    """Objets du jeu espaces_verts de l'open data de Paris qui ont une géométrie."""
     reponse = requests.get(URL_ESPACES_VERTS, timeout=180)
     reponse.raise_for_status()
     return [espace for espace in reponse.json()["features"] if espace["geometry"] is not None]
 
 
 def unir_en_metres(espaces: list):
-    """Union des polygones des espaces donnés, en mètres sur le plan local d'eau.py."""
     # make_valid répare les polygones mal formés
     union = shapely.force_2d(shapely.union_all([shapely.make_valid(shape(espace["geometry"])) for espace in espaces]))
     # coordonnées shapely dans l'ordre (lon, lat)
@@ -44,13 +42,11 @@ def unir_en_metres(espaces: list):
 
 
 def distance_a_l_espace_vert(lat, lon, espaces_verts):
-    """Distance en mètres à l'espace vert le plus proche, 0 si le point est dans un espace vert."""
     x, y = en_metres(lat, lon)
     return shapely.distance(shapely.points(x, y), espaces_verts)
 
 
 def verifier_distances_espaces_verts(rats: pd.DataFrame, espaces_verts) -> float:
-    """Recalcule la distance aux espaces verts des signalements et renvoie l'écart maximal (m) avec le csv."""
     distances = distance_a_l_espace_vert(rats["Y"], rats["X"], espaces_verts)
     ecart_max = float(np.max(np.abs(distances - rats["distance_espace_vert"])))
     if ecart_max > ECART_MAX_TOLERE_M:
@@ -59,8 +55,6 @@ def verifier_distances_espaces_verts(rats: pd.DataFrame, espaces_verts) -> float
 
 
 def decrire_carreaux(carreaux: pd.DataFrame, contour, eau, espaces_verts, bois) -> pd.DataFrame:
-    """Ajoute à chaque carreau sa part de surface dans Paris, les distances de son centre à l'eau et aux
-    espaces verts, et deux indicatrices : centre dans un espace vert, centre dans un bois."""
     carreaux = carreaux.copy()
     rectangles = shapely.box(
         carreaux["lon_min"].to_numpy(),
@@ -83,7 +77,6 @@ def decrire_carreaux(carreaux: pd.DataFrame, contour, eau, espaces_verts, bois) 
 
 
 def compter_par_carreau(rats: pd.DataFrame, carreaux: pd.DataFrame, debut: str) -> pd.DataFrame:
-    """Ajoute CIBLE : nombre total de signalements par carreau depuis debut (0 si aucun)."""
     rats = rats[rats["DATEDECL"] >= debut]
     # dans les données, X = longitude et Y = latitude
     ids = rattacher_aux_carreaux(rats.rename(columns={"Y": "lat", "X": "lon"}), carreaux)
@@ -94,15 +87,10 @@ def compter_par_carreau(rats: pd.DataFrame, carreaux: pd.DataFrame, debut: str) 
 
 
 def estimer_modele_spatial(carreaux: pd.DataFrame):
-    """Régression linéaire (MCO) de CIBLE sur VARIABLES, écarts-types robustes (HC1)."""
     return sm.OLS(carreaux[CIBLE], sm.add_constant(carreaux[VARIABLES])).fit(cov_type="HC1")
 
 
 def preparer_carreaux(rats: pd.DataFrame) -> tuple[pd.DataFrame, float]:
-    """Tous les carreaux de Paris avec leurs variables et leur nombre de signalements depuis DATE_DEBUT.
-
-    Renvoie aussi l'écart maximal (m) entre nos distances aux espaces verts et celles du csv.
-    """
     espaces = telecharger_espaces_verts()
     espaces_verts = unir_en_metres(espaces)
     bois = unir_en_metres([espace for espace in espaces if espace["properties"].get("type_ev") == TYPE_BOIS])
