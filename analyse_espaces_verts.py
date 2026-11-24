@@ -12,7 +12,6 @@ from matplotlib.colors import LogNorm
 # PARAMÈTRES
 # ---------------------------------------------------------------
 EXCLURE_BOIS = True    # True : retire les bois des observations ET de la référence
-TAMPON = 0             # m. >0 agrandit les espaces verts, <0 les rétrécit (test de robustesse)
 BW = 10                # largeur des classes de distance (m)
 RMAX = 450             # distance maximale affichée (m)
 N_REF = 100_000        # nombre de points aléatoires de référence
@@ -47,8 +46,6 @@ pts_all = points.to_crs(2154)             # toutes les observations (avant filtr
 # de Paris : un parc juste après le périph reste un parc proche.
 # Elle sert au calcul des distances ET à la définition de "dans un espace vert".
 ev_union = ev.union_all()
-if TAMPON != 0:
-    ev_union = ev_union.buffer(TAMPON)
 
 # ---------------------------------------------------------------
 # 3. ZONE D'ÉTUDE ET FILTRAGE DES OBSERVATIONS
@@ -336,7 +333,7 @@ plt.savefig("Outputs/composteurs_dans_ev.png", dpi=150, bbox_inches="tight")
 plt.close(fig)
 
 # ===============================================================
-# STRATE 2 : HORS ESPACES VERTS (carte 2D, quantiles de la strate)
+# STRATE 2 : HORS ESPACES VERTS
 # ===============================================================
 dev_o = d_ev_obs[~dedans_obs]; dc_o = d_obs_c[~dedans_obs]
 dev_r = d_ev_ref[~dedans_ref]; dc_r = d_ref_c[~dedans_ref]
@@ -345,37 +342,62 @@ print(f"Hors espaces verts : {len(dev_o)} obs., {len(dev_r)} points de référen
 rho_out = stats.spearmanr(dev_r, dc_r)[0]
 print("Spearman (référence hors espaces verts) :", rho_out.round(2))
 
+# Quantiles de la RÉFÉRENCE appliqués aux deux jeux (panneaux 1 et 2)
 u_r, u_o = ecdf(dev_r, dev_r), ecdf(dev_r, dev_o)
 v_r, v_o = ecdf(dc_r, dc_r), ecdf(dc_r, dc_o)
-
-b = np.linspace(0, 1, 11)
-H_o, _, _ = np.histogram2d(u_o, v_o, bins=[b, b])
-H_r, _, _ = np.histogram2d(u_r, v_r, bins=[b, b])
-rat = np.full(H_o.shape, np.nan)
-ok = (H_o >= MIN_N) & (H_r > 0)
-rat[ok] = (H_o[ok] / H_o.sum()) / (H_r[ok] / H_r.sum())
 
 def graduations2(ax, dx, dy, pas=0.2, fontsize=8):
     q = np.round(np.arange(0, 1 + 1e-9, pas), 2)
     ax.set_xticks(q); ax.set_xticklabels([f"{x:.1f}\n{np.quantile(dx, x):.0f} m" for x in q], fontsize=fontsize)
     ax.set_yticks(q); ax.set_yticklabels([f"{x:.1f} · {np.quantile(dy, x):.0f} m" for x in q], fontsize=fontsize)
 
-fig, ax = plt.subplots(1, 3, figsize=(22, 6), constrained_layout=True)
+# --- Classes en mètres pour la carte d'intensité relative (panneau 3) ---
+bins_ev = [0, 15, 30, 60, 100, np.inf]         # distance à l'espace vert (m)
+bins_c  = [0, 100, 250, 500, 1000, np.inf]     # distance au composteur (m)
+
+def etiquettes(bins):
+    return [f"{int(a)}–{int(b)}" if np.isfinite(b) else f"> {int(a)}"
+            for a, b in zip(bins[:-1], bins[1:])]
+
+H_o, _, _ = np.histogram2d(dev_o, dc_o, bins=[bins_ev, bins_c])
+H_r, _, _ = np.histogram2d(dev_r, dc_r, bins=[bins_ev, bins_c])
+R = (H_o / H_o.sum()) / np.where(H_r > 0, H_r / H_r.sum(), np.nan)
+R_aff = np.where(H_o >= MIN_N, R, np.nan)       # faible effectif : grisé
+
+fig, ax = plt.subplots(1, 3, figsize=(24, 6.5), constrained_layout=True)
+
+# Panneau 1 : référence
 sel = np.random.default_rng(1).choice(len(u_r), size=min(len(u_o), len(u_r)), replace=False)
 ax[0].scatter(u_r[sel], v_r[sel], s=2, alpha=0.3)
 ax[0].set_title(f"Référence hors espaces verts (Spearman = {rho_out:.2f})")
+
+# Panneau 2 : observations
 ax[1].scatter(u_o, v_o, s=2, alpha=0.3, color="tab:red")
 ax[1].set_title("Observations hors espaces verts")
+
 for a in ax[:2]:
     a.set(xlabel="Quantile (et distance) à l'espace vert", ylabel="Quantile (et distance) au composteur",
           xlim=(0, 1), ylim=(0, 1))
     graduations2(a, dev_r, dc_r)
     a.grid(True, alpha=0.3)
 
-m = ax[2].pcolormesh(b, b, rat.T, cmap="RdBu_r", norm=LogNorm(vmin=0.2, vmax=5), shading="flat")
-plt.colorbar(m, ax=ax[2], label="Intensité relative (1 = hasard)")
-ax[2].set(xlabel="Quantile (et distance) à l'espace vert", ylabel="Quantile (et distance) au composteur",
-          title="Intensité relative (cases de même masse)")
-graduations2(ax[2], dev_r, dc_r, pas=0.1, fontsize=7)
+# Panneau 3 : carte en classes de mètres, valeurs écrites dans les cases
+cmap = plt.get_cmap("RdBu_r").copy(); cmap.set_bad("lightgrey")
+m = ax[2].pcolormesh(np.arange(len(bins_ev)), np.arange(len(bins_c)), R_aff.T,
+                     cmap=cmap, norm=LogNorm(vmin=0.2, vmax=5), shading="flat")
+plt.colorbar(m, ax=ax[2], label="Intensité relative (1 = hasard, échelle log)")
+
+for i in range(R.shape[0]):
+    for j in range(R.shape[1]):
+        txt = (f"×{R[i, j]:.1f}\n(n={int(H_o[i, j])})" if H_o[i, j] >= MIN_N
+               else f"n={int(H_o[i, j])}")
+        ax[2].text(i + 0.5, j + 0.5, txt, ha="center", va="center", fontsize=8)
+
+ax[2].set_xticks(np.arange(len(bins_ev) - 1) + 0.5); ax[2].set_xticklabels(etiquettes(bins_ev))
+ax[2].set_yticks(np.arange(len(bins_c) - 1) + 0.5);  ax[2].set_yticklabels(etiquettes(bins_c))
+ax[2].set(xlabel="Distance à l'espace vert le plus proche (m)",
+          ylabel="Distance au composteur le plus proche (m)",
+          title="Intensité relative (classes en mètres)")
+
 plt.savefig("Outputs/rangs_2d_hors_ev.png", dpi=150, bbox_inches="tight")
 plt.close(fig)
