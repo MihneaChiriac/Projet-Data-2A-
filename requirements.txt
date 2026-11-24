@@ -1,0 +1,18 @@
+# application (app.py) et modèles (prediction.py, modele_spatial.py, eau.py, grille.py, dbscan.py)
+numpy==2.5.4
+pandas==3.1.1
+plotly==7.1.0
+requests==2.34.2
+scikit-learn==1.9.1
+shapely==2.2.0
+statsmodels==0.15.0
+streamlit==1.67.0
+
+# préparation des données et analyse des espaces verts (aggrementation_data.py, analyse_espaces_verts.py)
+geopandas==1.2.0
+matplotlib==3.11.2
+osmnx==2.2.0
+scipy==1.18.1
+
+# exécution du notebook (analyse_signalements.ipynb)
+ipykernel==7.4.0
