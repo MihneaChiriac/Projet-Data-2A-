@@ -8,11 +8,10 @@ import streamlit as st
 
 from dbscan import regrouper_points
 from grille import URL_ARRONDISSEMENTS
-from modele_spatial import CIBLE, estimer_modele_spatial, preparer_carreaux
+from modele_spatial import CIBLE, FICHIER_RATS, charger_positions, estimer_modele_spatial, preparer_carreaux
 from prediction import (
     DATE_DEBUT,
     FICHIER_METEO,
-    FICHIER_RATS_COMPLET,
     SAISON_PAR_MOIS,
     SEUIL_PLUIE_MM,
     charger_meteo,
@@ -117,8 +116,8 @@ def tracer_carte(geojson: dict, risques: pd.DataFrame):
     return figure
 
 
-def calculer_carreaux(rats: pd.DataFrame) -> pd.DataFrame:
-    carreaux, _ = preparer_carreaux(rats)
+def calculer_carreaux() -> pd.DataFrame:
+    carreaux = preparer_carreaux(charger_positions(FICHIER_RATS))
     # une valeur ajustée négative est ramenée à 0, comme pour les prédictions par arrondissement
     carreaux["attendu"] = np.maximum(0, estimer_modele_spatial(carreaux).fittedvalues).round(2)
     # attendu / moyenne = (probabilité qu'un signalement de Paris tombe dans ce carreau)
@@ -220,8 +219,9 @@ colonne_logo.image(str(FICHIER_LOGO), width=90)
 colonne_titre.title(TITRE)
 colonne_titre.subheader(SOUS_TITRE)
 
-# lus une seule fois par affichage, puis passés aux onglets
-rats = charger_signalements(FICHIER_RATS_COMPLET)
+# lus une seule fois par affichage, pour les onglets « Prévision du jour » et « Foyers (DBSCAN) » ;
+# l'onglet « Les zones à risque » lit clean_rats.csv dans calculer_carreaux
+rats = charger_signalements(FICHIER_RATS)
 
 onglet_risque, onglet_carreaux, onglet_dbscan = st.tabs(
     ["Prévision du jour", "Les zones à risque", "Foyers (DBSCAN)"]
@@ -248,7 +248,7 @@ with onglet_risque:
     st.plotly_chart(tracer_carte(charger_arrondissements(), risques), width="stretch")
 
 with onglet_carreaux:
-    carreaux = calculer_carreaux(rats)
+    carreaux = calculer_carreaux()
     moyenne_paris = f"{carreaux['attendu'].mean():.1f}".replace(".", ",")
     st.caption(
         "Risque de chaque carreau de 200 m rapporté à la moyenne de Paris : signalements attendus dans le "
