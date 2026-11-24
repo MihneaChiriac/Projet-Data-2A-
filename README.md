@@ -14,7 +14,7 @@ Depuis la racine du dépôt, installer les dépendances (testé avec Python 3.12
 
 ```
 python -m pip install -r requirements.txt
-streamlit run app.py
+python -m streamlit run app.py
 ```
 
 L'application s'ouvre dans le navigateur. Elle lit `données/clean_rats.csv` et `données/clean_meteo.csv`, et a besoin d'une connexion internet pour la météo du jour et les contours des arrondissements.
