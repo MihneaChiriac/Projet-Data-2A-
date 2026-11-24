@@ -6,8 +6,8 @@ import plotly.express as px
 import requests
 import streamlit as st
 
-# --- ajout dbscan ---
 from dbscan import regrouper_points
+from grille import URL_ARRONDISSEMENTS
 from modele_spatial import CIBLE, estimer_modele_spatial, preparer_carreaux
 from prediction import (
     DATE_DEBUT,
@@ -23,10 +23,6 @@ from prediction import (
     predire_risque_par_arrondissement,
 )
 
-URL_ARRONDISSEMENTS = (
-    "https://opendata.paris.fr/api/explore/v2.1/catalog/datasets/"
-    "arrondissements/exports/geojson"
-)
 CENTRE_PARIS = {"lat": 48.8566, "lon": 2.3522}
 FICHIER_LOGO = Path(__file__).parent / "rat.png"
 TITRE = "Rat-dar"
@@ -108,7 +104,7 @@ def tracer_carte(geojson: dict, risques: pd.DataFrame):
         color="risque",
         color_continuous_scale=["white", "red"],
         # échelle fixe : les couleurs restent comparables d'un jour à l'autre
-        # (les prédictions vont de 0 à 0,41 pour des températures de -2 à 43 °C)
+        # (les prédictions vont de 0 à 0,446 pour des températures de -4 à 43 °C)
         range_color=(0, 0.45),
         center=CENTRE_PARIS,
         zoom=10.8,
@@ -188,7 +184,6 @@ def tracer_carreaux(carreaux: pd.DataFrame):
     return figure
 
 
-# --- ajout dbscan ---
 def signalements_de_l_annee(rats: pd.DataFrame, annee: int) -> pd.DataFrame:
     selection = rats[rats["DATEDECL"].dt.year == annee]
     # dans les données, X = longitude et Y = latitude
@@ -214,7 +209,6 @@ def tracer_foyers(signalements: pd.DataFrame):
     figure.update_traces(marker={"size": 8})
     figure.update_layout(margin={"l": 0, "r": 0, "t": 0, "b": 0})
     return figure
-# --- fin ajout dbscan ---
 
 
 # doit être la première commande streamlit : titre et icône de l'onglet du navigateur
@@ -275,7 +269,6 @@ with onglet_carreaux:
     )
     st.plotly_chart(tracer_carreaux(carreaux), width="stretch")
 
-# --- ajout dbscan ---
 with onglet_dbscan:
     # une année à la fois : sur plusieurs années, les foyers fusionnent en quelques foyers géants
     annee = st.select_slider("Année", options=ANNEES_FOYERS, value=ANNEES_FOYERS[-1])
@@ -294,4 +287,3 @@ with onglet_dbscan:
     st.write(f"{annee} : {len(signalements)} signalements, {nb_foyers} foyers trouvés, {nb_isoles} signalements isolés")
 
     st.plotly_chart(tracer_foyers(signalements), width="stretch")
-# --- fin ajout dbscan ---
