@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 import pandas as pd
 import geopandas as gpd
@@ -19,11 +21,16 @@ MIN_N = 20             # effectif minimal d'une classe pour calculer son ratio
 
 rng = np.random.default_rng(0)
 
+# Chemins relatifs au script : il se lance quel que soit le dossier courant
+DOSSIER_DONNEES = Path(__file__).parent / "données"
+DOSSIER_SORTIES = Path(__file__).parent / "Outputs"
+DOSSIER_SORTIES.mkdir(exist_ok=True)
+
 # ---------------------------------------------------------------
 # 1. CHARGEMENT DES DONNÉES
 # ---------------------------------------------------------------
-espaces_verts = gpd.read_file('espaces_verts.geojson')    # polygones (EPSG:4326)
-data = pd.read_csv('clean_rats.csv')
+espaces_verts = gpd.read_file(DOSSIER_DONNEES / "espaces_verts.geojson")    # polygones (EPSG:4326)
+data = pd.read_csv(DOSSIER_DONNEES / "clean_rats.csv")
 
 points = gpd.GeoDataFrame(
     data,
@@ -171,7 +178,7 @@ for a in ax:
     a.minorticks_on()
     a.grid(True, which="minor", alpha=0.1)
 
-plt.savefig("Outputs/hors_espaces_verts.png", dpi=150, bbox_inches="tight")
+plt.savefig(DOSSIER_SORTIES / "hors_espaces_verts.png", dpi=150, bbox_inches="tight")
 plt.close(fig)
 
 # ---------------------------------------------------------------
@@ -181,7 +188,7 @@ fig, ax = plt.subplots(figsize=(4.5, 4.5))
 ax.bar(["Observations", "Surface"], [k / n, p0], color=["tab:red", "tab:green"], zorder=3)
 ax.set(ylabel="Proportion dans un espace vert", title="Dans un espace vert")
 ax.grid(True, axis="y", alpha=0.3, zorder=0)
-plt.savefig("Outputs/dans_espaces_verts.png", dpi=150, bbox_inches="tight")
+plt.savefig(DOSSIER_SORTIES / "dans_espaces_verts.png", dpi=150, bbox_inches="tight")
 plt.close(fig)
 
 print("done espaces verts")
@@ -193,7 +200,7 @@ RMAX_C = 2000    # m. Les composteurs sont bien plus espacés que les espaces ve
 BW_C = 50        # m. Classes plus larges, pour garder des effectifs suffisants
 
 # --- Chargement ---
-composteurs = gpd.read_file('dechets-menagers-points-dapport-volontaire-composteurs.geojson')          # <- adaptez le nom du fichier
+composteurs = gpd.read_file(DOSSIER_DONNEES / "dechets-menagers-points-dapport-volontaire-composteurs.geojson")
 composteurs = composteurs[~(composteurs.geometry.isna() | composteurs.geometry.is_empty)]
 composteurs = composteurs.to_crs(2154)
 # Si certaines géométries ne sont pas des points, on prend leur centroïde
@@ -274,7 +281,7 @@ for a in ax:
     a.minorticks_on()
     a.grid(True, which="minor", alpha=0.1)
 
-plt.savefig("Outputs/composteurs.png", dpi=150, bbox_inches="tight")
+plt.savefig(DOSSIER_SORTIES / "composteurs.png", dpi=150, bbox_inches="tight")
 plt.close(fig)
 
 print("done composteurs")
@@ -329,7 +336,7 @@ ax[1].set(xlabel="Distance au composteur (m)", ylabel="f_obs / f_ref",
 
 for a in ax:
     a.grid(True, alpha=0.3)
-plt.savefig("Outputs/composteurs_dans_ev.png", dpi=150, bbox_inches="tight")
+plt.savefig(DOSSIER_SORTIES / "composteurs_dans_ev.png", dpi=150, bbox_inches="tight")
 plt.close(fig)
 
 # ===============================================================
@@ -399,5 +406,5 @@ ax[2].set(xlabel="Distance à l'espace vert le plus proche (m)",
           ylabel="Distance au composteur le plus proche (m)",
           title="Intensité relative (classes en mètres)")
 
-plt.savefig("Outputs/rangs_2d_hors_ev.png", dpi=150, bbox_inches="tight")
+plt.savefig(DOSSIER_SORTIES / "rangs_2d_hors_ev.png", dpi=150, bbox_inches="tight")
 plt.close(fig)
