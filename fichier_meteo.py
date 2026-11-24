@@ -1,7 +1,7 @@
 import pandas as pd
 
 # prise en main des données
-test = pd.read_csv('Data/historique-meteo-paris-2012.csv', sep=',', comment="#")
+test = pd.read_csv('données/historique-meteo-paris-2012.csv', sep=',', comment="#")
 print(test.head(3))
 print(test.dtypes)
 print(test.columns)
@@ -11,7 +11,7 @@ print(test.columns)
 meteos = {}
 for i in range(12, 26):
     print(i)
-    meteos[f"meteo20{i}"] = pd.read_csv(f'Data/historique-meteo-paris-20{i}.csv', sep=',', comment="#")
+    meteos[f"meteo20{i}"] = pd.read_csv(f'données/historique-meteo-paris-20{i}.csv', sep=',', comment="#")
     meteos[f"meteo20{i}"]["DATE"] = pd.to_datetime(meteos[f"meteo20{i}"]["DATE"])
     meteos[f"meteo20{i}"]["JOUR"] = meteos[f"meteo20{i}"]["DATE"].dt.day
     meteos[f"meteo20{i}"]["MOIS"] = meteos[f"meteo20{i}"]["DATE"].dt.month
@@ -39,4 +39,4 @@ for i in range(12,26):
 
 meteo_clean = pd.concat(meteos.values(), ignore_index=True)
 print(meteo_clean.sample(20))
-meteo_clean.to_csv('Data/clean_meteo.csv')
+meteo_clean.to_csv('données/clean_meteo.csv')

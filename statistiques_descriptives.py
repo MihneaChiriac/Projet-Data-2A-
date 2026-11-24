@@ -2,7 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 
-data = pd.read_csv("Data/clean_rats.csv")
+data = pd.read_csv("données/clean_rats.csv")
 
 # PREMIERES STATISTIQUES ------------------------------------------
 # Caractéristiques du tableau :

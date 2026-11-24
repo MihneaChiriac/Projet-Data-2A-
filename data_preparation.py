@@ -1,19 +1,19 @@
 import pandas as pd
 
-data2012 = pd.read_csv('Data/DMR_2012.csv', sep=";", encoding='utf-8')
-data2013 = pd.read_csv('Data/DMR_2013.csv', sep=";", encoding='utf-8')
-data2014 = pd.read_csv('Data/DMR_2014.csv', sep=";", encoding='utf-8')
-data2015 = pd.read_csv('Data/DMR_2015.csv', sep=";", encoding='utf-8')
-data2016 = pd.read_csv('Data/DMR_2016.csv', sep=";", encoding='utf-8')
-data2017 = pd.read_csv('Data/DMR_2017.csv', sep=";", encoding='utf-8')
-data2018 = pd.read_csv('Data/DMR_2018.csv', sep=";", encoding='utf-8')
-data2019 = pd.read_csv('Data/DMR_2019.csv', sep=";", encoding='utf-8')
-data2020 = pd.read_csv('Data/DMR_2020.csv', sep=";", encoding='utf-8')
-data2021 = pd.read_csv('Data/DMR_2021.csv', sep=";", encoding='utf-8')
-data2022 = pd.read_csv('Data/DMR_2022.csv', sep=";", encoding='cp1252')
-data2023 = pd.read_csv('Data/DMR_2023.csv', sep=";", encoding='cp1252')
-data2024 = pd.read_csv('Data/DMR_2024.csv', sep=";", encoding='utf-8')
-data2025 = pd.read_csv('Data/DMR_2025.csv', sep=";", encoding='utf-8')
+data2012 = pd.read_csv('données/DMR_2012.csv', sep=";", encoding='utf-8')
+data2013 = pd.read_csv('données/DMR_2013.csv', sep=";", encoding='utf-8')
+data2014 = pd.read_csv('données/DMR_2014.csv', sep=";", encoding='utf-8')
+data2015 = pd.read_csv('données/DMR_2015.csv', sep=";", encoding='utf-8')
+data2016 = pd.read_csv('données/DMR_2016.csv', sep=";", encoding='utf-8')
+data2017 = pd.read_csv('données/DMR_2017.csv', sep=";", encoding='utf-8')
+data2018 = pd.read_csv('données/DMR_2018.csv', sep=";", encoding='utf-8')
+data2019 = pd.read_csv('données/DMR_2019.csv', sep=";", encoding='utf-8')
+data2020 = pd.read_csv('données/DMR_2020.csv', sep=";", encoding='utf-8')
+data2021 = pd.read_csv('données/DMR_2021.csv', sep=";", encoding='utf-8')
+data2022 = pd.read_csv('données/DMR_2022.csv', sep=";", encoding='cp1252')
+data2023 = pd.read_csv('données/DMR_2023.csv', sep=";", encoding='cp1252')
+data2024 = pd.read_csv('données/DMR_2024.csv', sep=";", encoding='utf-8')
+data2025 = pd.read_csv('données/DMR_2025.csv', sep=";", encoding='utf-8')
 
 # HARMONISATION DES COLONNES
 
@@ -28,7 +28,15 @@ for i in range(12, 26):
 for data in datas.values():
     print(data.loc[3, 'DATEDECL'])
     # On voir une forte hétérogénéité des formats de date
-    data["DATEDECL"] = pd.to_datetime(data["DATEDECL"], format="mixed", errors="coerce")
+    dates = pd.to_datetime(data["DATEDECL"], format="mixed", errors="coerce")
+    # format="mixed" lit une date JJ/MM/AAAA dont le jour vaut au plus 12 comme MM/JJ (fichiers 2021 à 2025) :
+    # MOISDECL, colonne du fichier brut, donne le vrai mois, on échange alors le jour et le mois
+    mois_brut = pd.to_numeric(data["MOISDECL"], errors="coerce")
+    inverse = dates.dt.month.ne(mois_brut) & dates.dt.day.eq(mois_brut)
+    dates_echangees = pd.to_datetime(
+        pd.DataFrame({"year": dates.dt.year, "month": dates.dt.day, "day": dates.dt.month}), errors="coerce"
+    )
+    data["DATEDECL"] = dates.mask(inverse, dates_echangees)
     data["JOURDECL"] = data["DATEDECL"].dt.day
 
 
@@ -152,4 +160,4 @@ for col in data_clean.columns.drop(["ADRESSE", "X", "Y"]):
     print(f"____FIN CHECK FINAL: {col}____")
 # tout paraît ok
 
-data_clean.to_csv('Data/clean_rats.csv')
+data_clean.to_csv('données/clean_rats.csv')

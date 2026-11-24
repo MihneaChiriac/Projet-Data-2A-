@@ -6,7 +6,7 @@ import plotly.express as px
 import requests
 import streamlit as st
 
-from dbscan import regrouper_points
+from DBSCAN import regrouper_points
 from grille import URL_ARRONDISSEMENTS
 from modele_spatial import CIBLE, FICHIER_RATS, charger_positions, estimer_modele_spatial, preparer_carreaux
 from prediction import (
