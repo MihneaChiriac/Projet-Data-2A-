@@ -6,7 +6,7 @@ Ce projet cherche à savoir s'il est possible de « prédire » la présence d'u
 
 ## Lire le projet
 
-Toute l'analyse se trouve dans le notebook `notebook_corrigé.ipynb`, à lire dans l'ordre. Il présente les fichiers du dépôt au début.
+Toute l'analyse se trouve dans le notebook `notebook.ipynb`, à lire dans l'ordre. Il présente les fichiers du dépôt au début.
 
 ## Tester l'application
 
