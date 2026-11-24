@@ -4,9 +4,9 @@ import pandas as pd
 
 from eau import ajouter_distance_eau, charger_cours_d_eau
 
-DOSSIER = Path(__file__).parent
-FICHIER_RATS_ENRICHI = DOSSIER / "clean_rats_enrichi.csv"
-FICHIER_RATS_COMPLET = DOSSIER / "clean_rats_complet.csv"
+DOSSIER_DONNEES = Path(__file__).parent / "données"
+FICHIER_RATS_ENRICHI = DOSSIER_DONNEES / "clean_rats_enrichi.csv"
+FICHIER_RATS_COMPLET = DOSSIER_DONNEES / "clean_rats_complet.csv"
 
 # colonnes constantes, en doublon ou sans signification connue
 COLONNES_A_SUPPRIMER = [
@@ -32,11 +32,7 @@ COLONNES_A_SUPPRIMER = [
 
 
 def enrichir_avec_eau(fichier_entree: Path, fichier_sortie: Path) -> pd.DataFrame:
-    """Ajoute distance_eau_m aux signalements de fichier_entree et retire COLONNES_A_SUPPRIMER.
-
-    Écrit le résultat dans fichier_sortie et renvoie le DataFrame.
-    """
-    # index_col=0 : même convention que eau.py pour l'ancien index
+    # index_col=0 : la première colonne sans nom est l'ancien index
     rats = pd.read_csv(fichier_entree, index_col=0)
     eau = charger_cours_d_eau()
     rats = ajouter_distance_eau(rats, eau)

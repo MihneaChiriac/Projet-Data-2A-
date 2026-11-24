@@ -22,10 +22,8 @@ PARAMETRES_IGN = {
 }
 # seine, marne et canaux ; ajouter "Retenue" pour les lacs des bois
 NATURES_GARDEES = ["Ecoulement naturel", "Canal"]
-FICHIER_EAU = Path(__file__).parent / "data" / "cours_d_eau.geojson"
-# signalements nettoyés, X = longitude et Y = latitude
-FICHIER_RATS = Path(__file__).parent / "clean_rats.csv"
-FICHIER_RATS_EAU = Path(__file__).parent / "clean_rats_eau.csv"
+DOSSIER_DONNEES = Path(__file__).parent / "données"
+FICHIER_EAU = DOSSIER_DONNEES / "cours_d_eau.geojson"
 
 METRES_PAR_DEGRE = 111_320
 COS_PARIS = cos(radians(48.86))
@@ -38,8 +36,9 @@ def en_metres(lat, lon):
     return x, y
 
 
-# télécharge les cours d'eau et garde une copie dans data/
-# à relancer si on change NATURES_GARDEES
+# télécharge les cours d'eau et garde une copie dans données/
+# appelée par charger_cours_d_eau si la copie n'existe pas : supprimer données/cours_d_eau.geojson
+# pour la retélécharger (par exemple si on change NATURES_GARDEES)
 def telecharger_cours_d_eau() -> dict:
     reponse = requests.get(URL_IGN, params=PARAMETRES_IGN, timeout=150)
     reponse.raise_for_status()
@@ -80,17 +79,3 @@ def ajouter_distance_eau(signalements: pd.DataFrame, eau, col_lat="Y", col_lon="
     distances = distance_a_l_eau(signalements[col_lat], signalements[col_lon], eau)
     signalements["distance_eau_m"] = np.round(distances).astype(int)
     return signalements
-
-
-# crée data/cours_d_eau.geojson puis clean_rats_eau.csv
-if __name__ == "__main__":
-    donnees = telecharger_cours_d_eau()
-    print(f"{len(donnees['features'])} surfaces d'eau enregistrées dans {FICHIER_EAU}")
-    eau = charger_cours_d_eau()
-    print(f"pont neuf : {distance_a_l_eau(48.8572, 2.3413, eau):.0f} m de l'eau")
-
-    # index_col=0 : la première colonne sans nom est l'ancien index, on la garde telle quelle
-    rats = pd.read_csv(FICHIER_RATS, index_col=0)
-    rats = ajouter_distance_eau(rats, eau)
-    rats.to_csv(FICHIER_RATS_EAU)
-    print(f"{len(rats)} signalements avec distance à l'eau enregistrés dans {FICHIER_RATS_EAU}")
