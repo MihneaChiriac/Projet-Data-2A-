@@ -6,8 +6,13 @@ import statsmodels.api as sm
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 DOSSIER_DONNEES = Path(__file__).parent / "données"
+# le modèle n'utilise des signalements que la date et l'arrondissement
+FICHIER_RATS = DOSSIER_DONNEES / "clean_rats.csv"
+# pas utilisé ici, mais importé depuis ce fichier par app.py, modele_spatial.py et le notebook
 FICHIER_RATS_COMPLET = DOSSIER_DONNEES / "clean_rats_complet.csv"
 FICHIER_METEO = DOSSIER_DONNEES / "clean_meteo.csv"
+# format imposé : pandas ne devine pas l'ordre du jour et du mois, et lève une erreur sur une date à un autre format
+FORMAT_DATE = "%Y-%m-%d"
 
 CIBLE = "nb_signalements"
 ARRONDISSEMENTS = list(range(1, 21))
@@ -31,13 +36,16 @@ DATE_DEBUT_TEST = "2024-01-01"
 
 
 def charger_signalements(fichier: Path) -> pd.DataFrame:
-    rats = pd.read_csv(fichier, parse_dates=["DATEDECL"])
+    rats = pd.read_csv(fichier)
+    rats["DATEDECL"] = pd.to_datetime(rats["DATEDECL"], format=FORMAT_DATE)
     rats["ARRONDISSEMENT"] = rats["ARRONDISSEMENT"].astype(int)
     return rats
 
 
 def charger_meteo(fichier: Path) -> pd.DataFrame:
-    meteo = pd.read_csv(fichier, parse_dates=["DATE"]).sort_values("DATE")
+    meteo = pd.read_csv(fichier)
+    meteo["DATE"] = pd.to_datetime(meteo["DATE"], format=FORMAT_DATE)
+    meteo = meteo.sort_values("DATE")
     # shift(1) ne donne la veille que s'il y a exactement un jour par ligne, sans trou
     if not meteo["DATE"].diff().iloc[1:].eq(pd.Timedelta(days=1)).all():
         raise ValueError("la météo doit contenir chaque jour exactement une fois")
@@ -148,7 +156,7 @@ def predire_risque_par_arrondissement(resultat, temp_max_c: float, pluie_veille:
 
 
 if __name__ == "__main__":
-    rats = charger_signalements(FICHIER_RATS_COMPLET)
+    rats = charger_signalements(FICHIER_RATS)
     meteo = charger_meteo(FICHIER_METEO)
     panel = filtrer_periode(construire_panel(rats, meteo), DATE_DEBUT)
     resultat = estimer_modele(panel)

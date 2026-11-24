@@ -7,8 +7,11 @@ from shapely.geometry import shape
 
 from eau import charger_cours_d_eau, distance_a_l_eau, en_metres
 from grille import charger_contour_paris, creer_carreaux, rattacher_aux_carreaux
-from prediction import DATE_DEBUT, FICHIER_RATS_COMPLET, charger_signalements, tableau_coefficients
+from prediction import DATE_DEBUT, DOSSIER_DONNEES, tableau_coefficients
 
+# le modèle n'a besoin que de la date et de la position de chaque signalement
+FICHIER_RATS = DOSSIER_DONNEES / "clean_rats.csv"
+COLONNES_RATS = ["DATEDECL", "X", "Y"]
 # même source que aggrementation_data.py (espaces_verts.geojson), bois compris
 URL_ESPACES_VERTS = (
     "https://opendata.paris.fr/api/explore/v2.1/catalog/datasets/"
@@ -24,8 +27,10 @@ VARIABLES = [
     # les bois sont aussi des espaces verts : dans_bois mesure l'écart des bois par rapport aux autres
     "dans_bois",
 ]
-# écart toléré entre nos distances aux espaces verts et la colonne du csv
-ECART_MAX_TOLERE_M = 1.0
+
+
+def charger_positions(fichier) -> pd.DataFrame:
+    return pd.read_csv(fichier, usecols=COLONNES_RATS, parse_dates=["DATEDECL"])
 
 
 def telecharger_espaces_verts() -> list:
@@ -44,14 +49,6 @@ def unir_en_metres(espaces: list):
 def distance_a_l_espace_vert(lat, lon, espaces_verts):
     x, y = en_metres(lat, lon)
     return shapely.distance(shapely.points(x, y), espaces_verts)
-
-
-def verifier_distances_espaces_verts(rats: pd.DataFrame, espaces_verts) -> float:
-    distances = distance_a_l_espace_vert(rats["Y"], rats["X"], espaces_verts)
-    ecart_max = float(np.max(np.abs(distances - rats["distance_espace_vert"])))
-    if ecart_max > ECART_MAX_TOLERE_M:
-        raise ValueError(f"distances aux espaces verts différentes du csv (écart max {ecart_max:.1f} m)")
-    return ecart_max
 
 
 def decrire_carreaux(carreaux: pd.DataFrame, contour, eau, espaces_verts, bois) -> pd.DataFrame:
@@ -90,23 +87,22 @@ def estimer_modele_spatial(carreaux: pd.DataFrame):
     return sm.OLS(carreaux[CIBLE], sm.add_constant(carreaux[VARIABLES])).fit(cov_type="HC1")
 
 
-def preparer_carreaux(rats: pd.DataFrame) -> tuple[pd.DataFrame, float]:
+def preparer_carreaux(rats: pd.DataFrame) -> pd.DataFrame:
     espaces = telecharger_espaces_verts()
     espaces_verts = unir_en_metres(espaces)
     bois = unir_en_metres([espace for espace in espaces if espace["properties"].get("type_ev") == TYPE_BOIS])
-    ecart_max = verifier_distances_espaces_verts(rats, espaces_verts)
 
     contour = charger_contour_paris()
     carreaux = decrire_carreaux(creer_carreaux(contour), contour, charger_cours_d_eau(), espaces_verts, bois)
-    return compter_par_carreau(rats, carreaux, DATE_DEBUT), ecart_max
+    return compter_par_carreau(rats, carreaux, DATE_DEBUT)
 
 
 if __name__ == "__main__":
-    carreaux, ecart_max = preparer_carreaux(charger_signalements(FICHIER_RATS_COMPLET))
+    carreaux = preparer_carreaux(charger_positions(FICHIER_RATS))
     resultat = estimer_modele_spatial(carreaux)
 
     print("=== MODÈLE SPATIAL : total de signalements par carreau de 200 m ===")
-    print(f"Vérification : distances aux espaces verts recalculées, écart max avec le csv {ecart_max:.2f} m")
+    print(f"Données      : {FICHIER_RATS.name} (colonnes {', '.join(COLONNES_RATS)})")
     print(f"Carreaux     : {int(resultat.nobs)} (tous, y compris sans signalement), dont "
           f"{carreaux['dans_espace_vert'].sum()} avec le centre dans un espace vert "
           f"({carreaux['dans_bois'].sum()} dans un bois)")
